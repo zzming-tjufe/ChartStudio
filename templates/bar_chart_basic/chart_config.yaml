@@ -1,0 +1,66 @@
+chart:
+  title: "各组样本数量对比"
+  subtitle: ""
+
+figure:
+  width: 9.0
+  height: 6.0
+
+export:
+  dpi: 200
+  transparent: false
+
+font:
+  zh_name: "微软雅黑"
+  zh_path: ""
+  en_name: "Times New Roman"
+  en_path: ""
+  num_name: "Times New Roman"
+  num_path: ""
+  family: "sans-serif"
+  file_path: ""
+  title_size: 16
+  label_size: 12
+  tick_size: 10
+  legend_size: 10
+
+axes:
+  x_label: "分组"
+  y_label: "数量"
+  grid: true
+  grid_alpha: 0.2
+  spine_visible: true
+
+legend:
+  show: false
+  loc: "best"
+  frameon: false
+
+bar_style:
+  width: 0.6
+  edge_width: 1.0
+  alpha: 0.9
+
+series:
+  overall:
+    color: "#1976D2"
+  bar_a:
+    color: "#1976D2"
+    label: "A 组"
+  bar_b:
+    color: "#388E3C"
+    label: "B 组"
+  bar_c:
+    color: "#F57C00"
+    label: "C 组"
+  bar_d:
+    color: "#7B1FA2"
+    label: "D 组"
+
+data_labels:
+  show: true
+  fontsize: 10
+
+data:
+  categories: ["A 组", "B 组", "C 组", "D 组"]
+  values: [23.0, 45.0, 36.0, 52.0]

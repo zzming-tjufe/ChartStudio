@@ -1,0 +1,4 @@
+name: "基础热力图"
+template: heatmap_basic
+version: "1.0"
+description: "矩阵相关性或数值分布热力图"

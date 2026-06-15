@@ -1,0 +1,5 @@
+# 项目元信息
+name: "多折线图"
+template: line_chart
+version: "1.0"
+description: "ChartStudio 默认多折线图模板"

@@ -1,0 +1,4 @@
+name: "基础柱状图"
+template: bar_chart_basic
+version: "1.0"
+description: "垂直柱状图，适合分类数据对比"

@@ -1,0 +1,39 @@
+# 多折线图默认配置 — 所有可调参数集中在此文件
+chart:
+  title: "示例多折线图"
+  width: 10.0
+  height: 6.0
+  dpi: 100
+
+font:
+  family: "sans-serif"
+  title_size: 16
+  label_size: 12
+  tick_size: 10
+
+axes:
+  x_label: "X 轴"
+  y_label: "Y 轴"
+  grid: true
+  grid_alpha: 0.3
+
+line_style:
+  line_width: 2.0
+  marker_size: 6.0
+  marker: "o"
+
+series:
+  overall:
+    color: "#1565C0"
+  series_a:
+    color: "#E53935"
+    label: "系列 A"
+  series_b:
+    color: "#43A047"
+    label: "系列 B"
+
+# 数据列表 — 第一版仅展示，不在面板中编辑
+data:
+  x: [1, 2, 3, 4, 5]
+  series_a: [2.0, 4.0, 3.0, 5.0, 4.0]
+  series_b: [1.0, 3.0, 2.0, 4.0, 3.0]

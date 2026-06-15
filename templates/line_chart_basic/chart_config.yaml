@@ -1,0 +1,69 @@
+# 基础折线图配置
+chart:
+  title: "基础折线图"
+  subtitle: ""
+
+figure:
+  width: 10.0
+  height: 6.0
+
+export:
+  dpi: 150
+  transparent: false
+
+font:
+  zh_name: "微软雅黑"
+  zh_path: ""
+  en_name: "Times New Roman"
+  en_path: ""
+  num_name: "Times New Roman"
+  num_path: ""
+  family: "sans-serif"
+  file_path: ""
+  title_size: 16
+  label_size: 12
+  tick_size: 10
+  legend_size: 10
+
+axes:
+  x_label: "月份"
+  y_label: "数值"
+  grid: true
+  grid_alpha: 0.3
+  spine_visible: true
+
+legend:
+  show: true
+  loc: "best"
+  frameon: true
+  fontsize: 10
+
+line_style:
+  width: 2.0
+  marker_size: 6.0
+  marker: "o"
+  marker_edge_width: 1.0
+  alpha: 1.0
+
+series:
+  overall:
+    color: "#1565C0"
+  series_a:
+    color: "#E53935"
+    label: "实验组"
+  series_b:
+    color: "#43A047"
+    label: "对照组"
+
+custom_text:
+  title_xy: [0.5, 1.02]
+  legend_xy: [1.0, 1.0]
+
+data_labels:
+  show: false
+  fontsize: 9
+
+data:
+  x: [1, 2, 3, 4, 5]
+  series_a: [2.0, 4.0, 3.0, 5.0, 4.0]
+  series_b: [1.0, 3.0, 2.0, 4.0, 3.0]

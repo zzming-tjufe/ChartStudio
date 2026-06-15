@@ -1,0 +1,4 @@
+name: "横向柱状图"
+template: horizontal_bar_chart
+version: "1.0"
+description: "适合排名与比例展示的横向柱状图"

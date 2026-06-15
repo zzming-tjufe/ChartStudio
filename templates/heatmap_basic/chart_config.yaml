@@ -1,0 +1,49 @@
+chart:
+  title: "相关性热力图"
+  subtitle: ""
+
+figure:
+  width: 8.0
+  height: 7.0
+
+export:
+  dpi: 200
+  transparent: false
+
+font:
+  zh_name: "微软雅黑"
+  zh_path: ""
+  en_name: "Times New Roman"
+  en_path: ""
+  num_name: "Times New Roman"
+  num_path: ""
+  family: "sans-serif"
+  file_path: ""
+  title_size: 16
+  label_size: 12
+  tick_size: 9
+  legend_size: 10
+
+axes:
+  x_label: "变量"
+  y_label: "变量"
+  grid: false
+  grid_alpha: 0.3
+
+legend:
+  show: false
+
+heatmap:
+  cmap: "RdYlBu_r"
+  annot: true
+  linewidth: 0.5
+  colorbar: true
+
+data:
+  x_labels: ["变量 1", "变量 2", "变量 3", "变量 4"]
+  y_labels: ["变量 A", "变量 B", "变量 C", "变量 D"]
+  matrix:
+    - [1.0, 0.6, 0.3, 0.1]
+    - [0.6, 1.0, 0.5, 0.2]
+    - [0.3, 0.5, 1.0, 0.7]
+    - [0.1, 0.2, 0.7, 1.0]

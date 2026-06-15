@@ -1,0 +1,4 @@
+name: "报告风格多折线图"
+template: line_chart_report
+version: "1.0"
+description: "适合论文与报告的多系列折线图，支持副标题与图例定位"

@@ -1,0 +1,4 @@
+name: "基础散点图"
+template: scatter_chart_basic
+version: "1.0"
+description: "多组散点对比，适合相关性分析"

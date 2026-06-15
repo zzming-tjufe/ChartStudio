@@ -1,0 +1,62 @@
+chart:
+  title: "指标完成度排名"
+  subtitle: ""
+
+figure:
+  width: 10.0
+  height: 6.0
+
+export:
+  dpi: 200
+  transparent: false
+
+font:
+  zh_name: "微软雅黑"
+  zh_path: ""
+  en_name: "Times New Roman"
+  en_path: ""
+  num_name: "Times New Roman"
+  num_path: ""
+  family: "sans-serif"
+  file_path: ""
+  title_size: 16
+  label_size: 12
+  tick_size: 10
+  legend_size: 10
+
+axes:
+  x_label: "完成率 (%)"
+  y_label: ""
+  grid: true
+  grid_alpha: 0.2
+  spine_visible: true
+
+legend:
+  show: false
+
+bar_style:
+  width: 0.65
+  edge_width: 0.8
+  alpha: 0.88
+
+series:
+  overall:
+    color: "#00897B"
+  bar_a:
+    color: "#00897B"
+  bar_b:
+    color: "#26A69A"
+  bar_c:
+    color: "#4DB6AC"
+  bar_d:
+    color: "#80CBC4"
+  bar_e:
+    color: "#B2DFDB"
+
+data_labels:
+  show: true
+  fontsize: 9
+
+data:
+  categories: ["项目 A", "项目 B", "项目 C", "项目 D", "项目 E"]
+  values: [92.0, 85.0, 78.0, 71.0, 65.0]

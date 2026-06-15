@@ -1,0 +1,4 @@
+name: "基础折线图"
+template: line_chart_basic
+version: "1.0"
+description: "适合快速对比两组趋势的基础折线图模板"
