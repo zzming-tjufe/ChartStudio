@@ -6,7 +6,7 @@ from typing import Any, Dict, List
 
 import matplotlib.pyplot as plt
 
-from core.font_runtime import apply_chart_fonts, prepare_chart_fonts
+from core.axis_limits import apply_axis_limits
 
 
 def _group_keys(data: Dict[str, Any]) -> List[str]:
@@ -14,7 +14,6 @@ def _group_keys(data: Dict[str, Any]) -> List[str]:
 
 
 def draw_chart(config: Dict[str, Any]):
-    font_bundle = prepare_chart_fonts(config)
     chart_cfg = config.get("chart", {})
     fig_cfg = config.get("figure", {})
     export_cfg = config.get("export", {})
@@ -74,6 +73,6 @@ def draw_chart(config: Dict[str, Any]):
             legend_kwargs["bbox_to_anchor"] = (float(leg_xy[0]), float(leg_xy[1]))
         ax.legend(**legend_kwargs)
 
-    apply_chart_fonts(fig, font_bundle, font_cfg)
+    apply_axis_limits(ax, axes_cfg)
     fig.tight_layout()
     return fig

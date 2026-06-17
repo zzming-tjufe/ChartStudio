@@ -23,6 +23,7 @@ INT_SLIDER_RULES: Dict[str, Tuple[int, int]] = {
     "font.legend_size": (6, 24),
     "legend.fontsize": (6, 24),
     "data_labels.fontsize": (6, 20),
+    "data_labels.decimals": (0, 6),
     "export.dpi": (72, 600),
     "chart.dpi": (72, 600),
 }
@@ -47,6 +48,57 @@ FLOAT_SLIDER_RULES: Dict[str, Tuple[float, float, float]] = {
     "scatter_style.edge_width": (0.0, 3.0, 0.1),
     "heatmap.linewidth": (0.0, 3.0, 0.1),
 }
+
+
+from core.field_options import SELECT_FIELD_OPTIONS
+
+
+def _render_heatmap_cmap_field(value: str, prefix: str) -> str:
+    """热力图色图 — 中文名称 + 场景说明。"""
+    from core.heatmap_cmaps import (
+        HEATMAP_CMAP_OPTIONS,
+        cmap_display_label,
+        get_cmap_option,
+    )
+
+    label = get_field_label("heatmap.cmap")
+    widget_key = _widget_key("heatmap.cmap", prefix)
+    ids = [o.id for o in HEATMAP_CMAP_OPTIONS]
+    current = str(value or "RdYlBu_r")
+    if current not in ids:
+        ids = [current] + ids
+
+    selected = st.selectbox(
+        label,
+        options=ids,
+        index=ids.index(current),
+        format_func=cmap_display_label,
+        key=widget_key,
+        help="发散色适合相关矩阵；顺序色适合强度/频次；灰度适合打印。",
+    )
+    opt = get_cmap_option(selected)
+    if opt:
+        st.caption(f"**{opt.group}** · {opt.hint}")
+    elif selected != current:
+        st.caption("当前为自定义色图名，仍由 Matplotlib 渲染。")
+
+    with st.expander("色图选择参考", expanded=False):
+        last_group = ""
+        for o in HEATMAP_CMAP_OPTIONS:
+            if o.group != last_group:
+                st.markdown(f"**{o.group}**")
+                last_group = o.group
+            st.markdown(f"- **{o.label}**（`{o.id}`）：{o.hint}")
+
+    return selected
+
+
+def _render_select_field(path: str, value: str, options: List[str], prefix: str) -> str:
+    label = get_field_label(path)
+    widget_key = _widget_key(path, prefix)
+    if value in options:
+        return st.selectbox(label, options, index=options.index(value), key=widget_key)
+    return st.selectbox(label, options, key=widget_key)
 
 
 def is_color_string(value: Any) -> bool:
@@ -374,6 +426,10 @@ def render_field_widget(
         return picked.upper() if isinstance(picked, str) and picked.startswith("#") else picked
 
     if isinstance(value, str):
+        if path == "heatmap.cmap":
+            return _render_heatmap_cmap_field(value, prefix)
+        if path in SELECT_FIELD_OPTIONS:
+            return _render_select_field(path, value, SELECT_FIELD_OPTIONS[path], prefix)
         if path.endswith("file_path") or path.endswith("font_path"):
             sync_key = _widget_key(f"{path}_file_sync", prefix)
             if sync_key in st.session_state:

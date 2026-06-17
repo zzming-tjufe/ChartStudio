@@ -7,17 +7,18 @@ from typing import Any, Dict
 import matplotlib.pyplot as plt
 import numpy as np
 
-from core.font_runtime import apply_chart_fonts, prepare_chart_fonts
+from core.axis_limits import apply_axis_limits
+from core.data_label_format import format_data_label
 
 
 def draw_chart(config: Dict[str, Any]):
-    font_bundle = prepare_chart_fonts(config)
     chart_cfg = config.get("chart", {})
     fig_cfg = config.get("figure", {})
     export_cfg = config.get("export", {})
     font_cfg = config.get("font", {})
     axes_cfg = config.get("axes", {})
     heat_cfg = config.get("heatmap", {})
+    label_cfg = config.get("data_labels", {})
     data = config.get("data", {})
 
     matrix = np.array(data.get("matrix", [[0]]), dtype=float)
@@ -52,7 +53,7 @@ def draw_chart(config: Dict[str, Any]):
                 ax.text(
                     j,
                     i,
-                    f"{matrix[i, j]:.1f}",
+                    format_data_label(matrix[i, j], label_cfg),
                     ha="center",
                     va="center",
                     color="black",
@@ -72,6 +73,6 @@ def draw_chart(config: Dict[str, Any]):
     if heat_cfg.get("colorbar", True):
         fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
 
-    apply_chart_fonts(fig, font_bundle, font_cfg)
+    apply_axis_limits(ax, axes_cfg)
     fig.tight_layout()
     return fig

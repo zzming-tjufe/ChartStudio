@@ -6,7 +6,8 @@ from typing import Any, Dict, List
 
 import matplotlib.pyplot as plt
 
-from core.font_runtime import apply_chart_fonts, prepare_chart_fonts
+from core.axis_limits import apply_axis_limits
+from core.data_label_format import format_data_label
 
 
 def _series_keys(data: Dict[str, Any]) -> List[str]:
@@ -25,7 +26,7 @@ def _apply_data_labels(ax, config: Dict[str, Any], series_cfg: Dict[str, Any]) -
         dx, dy = (float(offset[0]), float(offset[1])) if isinstance(offset, list) and len(offset) >= 2 else (0.0, 4.0)
         for x, y in zip(line.get_xdata(), line.get_ydata()):
             ax.annotate(
-                f"{y:.1f}",
+                format_data_label(y, label_cfg),
                 (x, y),
                 textcoords="offset points",
                 xytext=(dx * 10, dy * 10),
@@ -35,7 +36,6 @@ def _apply_data_labels(ax, config: Dict[str, Any], series_cfg: Dict[str, Any]) -
 
 
 def draw_chart(config: Dict[str, Any]):
-    font_bundle = prepare_chart_fonts(config)
     chart_cfg = config.get("chart", {})
     fig_cfg = config.get("figure", {})
     export_cfg = config.get("export", {})
@@ -96,6 +96,6 @@ def draw_chart(config: Dict[str, Any]):
         )
 
     _apply_data_labels(ax, config, series_cfg)
-    apply_chart_fonts(fig, font_bundle, font_cfg)
+    apply_axis_limits(ax, axes_cfg)
     fig.tight_layout()
     return fig

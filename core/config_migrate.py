@@ -8,7 +8,27 @@ from copy import deepcopy
 from typing import Any, Dict, List, Tuple
 
 
-def normalize_config(config: Dict[str, Any]) -> Tuple[Dict[str, Any], List[str]]:
+from core.constants import CHARTSTUDIO_VERSION, SCHEMA_VERSION
+
+
+def ensure_schema_metadata(
+    config: Dict[str, Any],
+    template_id: str = "",
+) -> Dict[str, Any]:
+    """写入/补全 schema_version、template_id、chartstudio_version。"""
+    if "schema_version" not in config:
+        config["schema_version"] = SCHEMA_VERSION
+    if template_id and not config.get("template_id"):
+        config["template_id"] = template_id
+    if "chartstudio_version" not in config:
+        config["chartstudio_version"] = CHARTSTUDIO_VERSION
+    return config
+
+
+def normalize_config(
+    config: Dict[str, Any],
+    template_id: str = "",
+) -> Tuple[Dict[str, Any], List[str]]:
     """
     在内存中规范化配置结构，不修改原 dict。
 
@@ -66,6 +86,26 @@ def normalize_config(config: Dict[str, Any]) -> Tuple[Dict[str, Any], List[str]]
         ensure_font_defaults(font)
         if had_legacy:
             notes.append("已为 font 配置补充中/英/数字字体名称与路径字段")
+
+    axes = cfg.get("axes")
+    if isinstance(axes, dict):
+        if "xlim" not in axes:
+            axes["xlim"] = None
+        if "ylim" not in axes:
+            axes["ylim"] = None
+        if "y_margin" not in axes:
+            axes["y_margin"] = 0.05
+
+    data_labels = cfg.get("data_labels")
+    if isinstance(data_labels, dict):
+        if "decimals" not in data_labels:
+            data_labels["decimals"] = 1
+        if "prefix" not in data_labels:
+            data_labels["prefix"] = ""
+        if "suffix" not in data_labels:
+            data_labels["suffix"] = ""
+
+    ensure_schema_metadata(cfg, template_id=template_id)
 
     return cfg, notes
 

@@ -6,24 +6,17 @@ from typing import Any, Dict, List
 
 import matplotlib.pyplot as plt
 
-from core.font_runtime import apply_chart_fonts, prepare_chart_fonts
+
+from core.axis_limits import apply_axis_limits
+from core.bar_colors import bar_colors_for_categories
+from core.data_label_format import format_data_label
 
 
-def _bar_colors(config: Dict[str, Any], count: int) -> List[str]:
-    series_cfg = config.get("series", {})
-    keys = sorted(k for k in series_cfg if k != "overall")
-    default = series_cfg.get("overall", {}).get("color", "#00897B")
-    colors: List[str] = []
-    for i in range(count):
-        if i < len(keys):
-            colors.append(series_cfg[keys[i]].get("color", default))
-        else:
-            colors.append(default)
-    return colors
+def _bar_colors(config: Dict[str, Any], categories: List[str]) -> List[str]:
+    return bar_colors_for_categories(config, categories)
 
 
 def draw_chart(config: Dict[str, Any]):
-    font_bundle = prepare_chart_fonts(config)
     chart_cfg = config.get("chart", {})
     fig_cfg = config.get("figure", {})
     export_cfg = config.get("export", {})
@@ -35,7 +28,7 @@ def draw_chart(config: Dict[str, Any]):
 
     categories = data.get("categories", [])
     values = data.get("values", [])
-    colors = _bar_colors(config, len(categories))
+    colors = _bar_colors(config, categories)
 
     fig, ax = plt.subplots(
         figsize=(float(fig_cfg.get("width", 10)), float(fig_cfg.get("height", 6))),
@@ -66,11 +59,11 @@ def draw_chart(config: Dict[str, Any]):
             ax.text(
                 v,
                 i,
-                f" {v:.0f}%",
+                format_data_label(v, label_cfg),
                 va="center",
                 fontsize=int(label_cfg.get("fontsize", 9)),
             )
 
-    apply_chart_fonts(fig, font_bundle, font_cfg)
+    apply_axis_limits(ax, axes_cfg)
     fig.tight_layout()
     return fig

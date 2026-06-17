@@ -40,6 +40,9 @@ FIELD_LABELS: Dict[str, str] = {
     "axes.grid": "显示网格",
     "axes.grid_alpha": "网格透明度",
     "axes.spine_visible": "显示边框",
+    "axes.xlim": "X 轴范围",
+    "axes.ylim": "Y 轴范围",
+    "axes.y_margin": "Y 轴留白比例",
     # 图例
     "legend.show": "显示图例",
     "legend.loc": "图例位置",
@@ -61,7 +64,7 @@ FIELD_LABELS: Dict[str, str] = {
     "scatter_style.alpha": "散点透明度",
     "scatter_style.edge_width": "散点描边",
     # 热力图
-    "heatmap.cmap": "色图方案",
+    "heatmap.cmap": "色图方案（发散/顺序/打印）",
     "heatmap.annot": "显示数值",
     "heatmap.linewidth": "格子线宽",
     "heatmap.colorbar": "显示色条",
@@ -71,6 +74,9 @@ FIELD_LABELS: Dict[str, str] = {
     "data_labels.show": "显示数据标签",
     "data_labels.fontsize": "数据标签字号",
     "data_labels.offset": "标签偏移",
+    "data_labels.decimals": "小数位数",
+    "data_labels.prefix": "标签前缀",
+    "data_labels.suffix": "标签后缀",
     # 自定义文字位置
     "custom_text.title_xy": "标题位置 [x, y]",
     "custom_text.legend_xy": "图例位置 [x, y]",

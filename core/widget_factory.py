@@ -8,7 +8,7 @@ from typing import Any, Dict
 
 import streamlit as st
 
-from core.config_loader import INTERNAL_CONFIG_KEYS
+from core.config_loader import INTERNAL_CONFIG_KEYS, deep_copy_config
 from core.field_labels import get_field_label
 from core.panel_groups import render_simple_panel
 from core.semantic_widgets import render_field_widget, render_font_settings
@@ -18,13 +18,6 @@ def _is_numeric_list(value: Any) -> bool:
     if not isinstance(value, list) or len(value) == 0:
         return False
     return all(isinstance(v, (int, float)) and not isinstance(v, bool) for v in value)
-
-
-def _render_data_section(data: Dict[str, Any]) -> Dict[str, Any]:
-    st.caption("数据请在「图表配置文件」中编辑。")
-    for key, value in data.items():
-        st.text(f"{key}: {value}")
-    return data
 
 
 def _render_advanced_recursive(
@@ -43,8 +36,25 @@ def _render_advanced_recursive(
         full_path = f"{path}.{key}" if path else key
 
         if key == "data" and isinstance(value, dict):
-            with st.expander("data（只读）", expanded=False):
-                result[key] = _render_data_section(value)
+            from core.data_importer import render_data_panel
+
+            title = get_field_label(full_path)
+            with st.expander(f"{title}  (`{full_path}`)", expanded=True):
+                root = None
+                tpl = ""
+                if st.session_state.get("project_info"):
+                    root = st.session_state.project_info.root
+                    tpl = st.session_state.project_info.template_id
+                working = deep_copy_config({**config, **result})
+                updated = render_data_panel(
+                    working,
+                    tpl,
+                    prefix=f"{prefix}_data_adv",
+                    project_root=root,
+                    show_json=True,
+                )
+                for uk, uv in updated.items():
+                    result[uk] = uv
             continue
 
         if key == "font" and isinstance(value, dict):
@@ -89,5 +99,12 @@ def render_config_panel(
         return _render_advanced_recursive(config, prefix=adv_prefix)
 
     return render_simple_panel(
-        config, prefix=simple_prefix, template_id=template_id or None
+        config,
+        prefix=simple_prefix,
+        template_id=template_id or None,
+        project_root=(
+            st.session_state.project_info.root
+            if st.session_state.get("project_info")
+            else None
+        ),
     )
