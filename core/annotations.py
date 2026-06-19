@@ -44,6 +44,30 @@ def _parse_coord_point(
     return coord, x, y
 
 
+def _coord_name(coord: str) -> str:
+    """Matplotlib annotate 坐标系名称。"""
+    mapping = {
+        "figure": "figure fraction",
+        "axes": "axes fraction",
+        "data": "data",
+    }
+    return mapping.get(coord, "data")
+
+
+def _parse_fill_color(value: Any, default: str = "none") -> str:
+    """解析 rectangle fill：false/none/0 → none，其余当作颜色。"""
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return "none" if not value else default
+    if isinstance(value, (int, float)) and value == 0:
+        return "none"
+    text = str(value).strip()
+    if text.lower() in ("none", "false", "no", ""):
+        return "none"
+    return text
+
+
 def _parse_style_dict(value: Any) -> Dict[str, Any]:
     return value if isinstance(value, dict) else {}
 
@@ -78,8 +102,6 @@ def _apply_text(fig, ax, item: dict) -> None:
 
 
 def _apply_arrow(fig, ax, item: dict) -> None:
-    from matplotlib.patches import FancyArrowPatch
-
     ann_id = str(item.get("id", "") or "")
     start = _parse_coord_point(item.get("start"), annotation_id=ann_id, field="start")
     end = _parse_coord_point(item.get("end"), annotation_id=ann_id, field="end")
@@ -88,21 +110,20 @@ def _apply_arrow(fig, ax, item: dict) -> None:
 
     start_coord, sx, sy = start
     end_coord, ex, ey = end
-    if start_coord != end_coord:
-        _warn(ann_id, "start 与 end 的 coord 必须一致")
-        return
-
     style = _parse_style_dict(item.get("style"))
-    arrow = FancyArrowPatch(
-        (sx, sy),
-        (ex, ey),
-        transform=_resolve_transform(fig, ax, start_coord),
-        arrowstyle=str(style.get("arrowstyle", "->")),
-        color=str(style.get("color", "#333333")),
-        linewidth=float(style.get("line_width", 1.5)),
-        mutation_scale=12,
+
+    ax.annotate(
+        str(item.get("text", "") or ""),
+        xy=(ex, ey),
+        xytext=(sx, sy),
+        xycoords=_coord_name(end_coord),
+        textcoords=_coord_name(start_coord),
+        arrowprops={
+            "arrowstyle": str(style.get("arrowstyle", "->")),
+            "color": str(style.get("color", "#333333")),
+            "lw": float(style.get("line_width", 1.5)),
+        },
     )
-    ax.add_patch(arrow)
 
 
 def _apply_rectangle(fig, ax, item: dict) -> None:
@@ -135,7 +156,7 @@ def _apply_rectangle(fig, ax, item: dict) -> None:
         width,
         height,
         transform=_resolve_transform(fig, ax, coord),
-        facecolor=str(style.get("fill", "none")),
+        facecolor=_parse_fill_color(style.get("fill", "none")),
         edgecolor=str(style.get("edge_color", "#333333")),
         linewidth=float(style.get("line_width", 1.0)),
         alpha=float(style.get("alpha", 1.0)),

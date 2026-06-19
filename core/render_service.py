@@ -13,6 +13,19 @@ from core.font_runtime import apply_chart_fonts, prepare_chart_fonts
 from core.project_manager import DEFAULT_TEMPLATE, _resolve_template_path
 
 
+def resolve_template_core_path(template_id: str) -> Path:
+    """模板目录下的 chart_core.py。"""
+    tid = template_id or DEFAULT_TEMPLATE
+    template_dir = _resolve_template_path(tid)
+    if template_dir is None:
+        raise FileNotFoundError(f"找不到模板：{tid}")
+
+    template_core = template_dir / "chart_core.py"
+    if not template_core.is_file():
+        raise FileNotFoundError(f"模板缺少 chart_core.py：{template_core}")
+    return template_core.resolve()
+
+
 def resolve_chart_core_path(
     project_root: Path,
     template_id: str,
@@ -26,15 +39,32 @@ def resolve_chart_core_path(
     if local_core.is_file():
         return local_core.resolve()
 
-    tid = template_id or DEFAULT_TEMPLATE
-    template_dir = _resolve_template_path(tid)
-    if template_dir is None:
-        raise FileNotFoundError(f"找不到模板：{tid}")
+    return resolve_template_core_path(template_id)
 
-    template_core = template_dir / "chart_core.py"
-    if not template_core.is_file():
-        raise FileNotFoundError(f"模板缺少 chart_core.py：{template_core}")
-    return template_core.resolve()
+
+def resolve_core_path_for_render(
+    template_id: str,
+    *,
+    core_path: Path | None = None,
+    project_root: Path | None = None,
+) -> Path:
+    """
+    解析渲染用的 chart_core.py。
+
+    1. 显式 core_path
+    2. project_root 下 local core，再模板
+    3. 仅 template_id 对应模板目录
+    """
+    if core_path is not None:
+        resolved = Path(core_path).expanduser().resolve()
+        if resolved.is_file():
+            return resolved
+        raise FileNotFoundError(f"chart_core.py 不存在：{resolved}")
+
+    if project_root is not None:
+        return resolve_chart_core_path(project_root.resolve(), template_id)
+
+    return resolve_template_core_path(template_id)
 
 
 def render_chart_from_config(
@@ -58,12 +88,13 @@ def render_chart_from_config(
 
     normalized, _ = normalize_config(cfg, template_id=tid)
 
-    if core_path is None:
-        if root is None:
-            raise ValueError("无法解析 chart_core.py：缺少 project_root 或 core_path")
-        core_path = resolve_chart_core_path(root, tid)
+    resolved_core = resolve_core_path_for_render(
+        tid,
+        core_path=core_path,
+        project_root=root,
+    )
 
-    draw_fn = import_draw_chart(core_path, purge_old=False)
+    draw_fn = import_draw_chart(resolved_core, purge_old=False)
     font_bundle = prepare_chart_fonts(normalized)
     fig = draw_fn(normalized)
     if fig is not None:

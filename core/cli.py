@@ -79,11 +79,7 @@ def _cmd_check(args: argparse.Namespace) -> int:
         normalized, notes = normalize_config(config, template_id=template_id)
 
         def _probe(cfg: dict):
-            return render_chart_from_config(
-                cfg,
-                template_id=template_id,
-                project_root=config_path.parent,
-            )
+            return render_chart_from_config(cfg, template_id=template_id)
 
         issues = validate_config_for_save(
             normalized,
@@ -116,11 +112,19 @@ def _cmd_export_code(args: argparse.Namespace) -> int:
     config_path = Path(args.config).expanduser().resolve()
     out_path = Path(args.out).expanduser().resolve()
     template_id = args.template or ""
+    export_format = str(args.format or "png").strip().lower()
+    if export_format not in ("png", "svg", "pdf"):
+        print(f"不支持的格式：{export_format}，请使用 png / svg / pdf", file=sys.stderr)
+        return 1
     repo = str(_repo_root())
 
     script = textwrap.dedent(
         f'''\
-        """ChartStudio 复现脚本 — 由 export-code 生成。"""
+        """ChartStudio 复现脚本 — 由 export-code 生成。
+
+        默认导出 {export_format.upper()}；生成时可指定 --format svg/pdf。
+        也可修改下方 EXPORT_FORMAT 常量。
+        """
         from __future__ import annotations
 
         import os
@@ -134,6 +138,7 @@ def _cmd_export_code(args: argparse.Namespace) -> int:
         PROJECT_ROOT = Path(__file__).resolve().parent
         CONFIG_PATH = PROJECT_ROOT / {config_path.name!r}
         TEMPLATE_ID = {template_id!r}
+        EXPORT_FORMAT = {export_format!r}
         DEFAULT_CHARTSTUDIO_ROOT = Path({repo!r})
 
 
@@ -184,7 +189,7 @@ def _cmd_export_code(args: argparse.Namespace) -> int:
             saved = export_figure(
                 fig,
                 out_dir,
-                "png",
+                EXPORT_FORMAT,
                 dpi=dpi,
                 transparent=transparent,
                 config=normalized,
@@ -227,6 +232,12 @@ def main(argv: list[str] | None = None) -> int:
     p_code.add_argument("config", help="chart_config.yaml 路径")
     p_code.add_argument("--template", default=None, help="模板 ID")
     p_code.add_argument("--out", required=True, help="输出 .py 脚本路径")
+    p_code.add_argument(
+        "--format",
+        default="png",
+        choices=("png", "svg", "pdf"),
+        help="复现脚本默认导出格式（默认 png）",
+    )
     p_code.set_defaults(func=_cmd_export_code)
 
     args = parser.parse_args(argv)
