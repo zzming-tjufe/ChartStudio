@@ -94,23 +94,40 @@ def validate_dropped_project_file(filename: str, raw: bytes) -> Tuple[bool, str]
     return False, "不支持的文件类型"
 
 
-def assess_new_project_path(path: str) -> Tuple[PathStatus, str]:
-    """评估新建项目目标路径是否可用。"""
-    text = path.strip()
-    if not text:
-        return "idle", "请输入或浏览选择保存位置"
+def assess_new_project_path(path: str, project_name: str = "") -> Tuple[PathStatus, str]:
+    """评估在 parent_dir 下以 project_name 创建子文件夹是否可用。"""
+    from core.path_utils import sanitize_project_name
+
+    parent_text = path.strip()
+    name_text = (project_name or "").strip()
+
+    if not parent_text:
+        return "idle", "请选择或输入要在其中创建项目的目录"
+
     try:
-        root = Path(text).expanduser().resolve()
+        parent = Path(parent_text).expanduser().resolve()
     except (OSError, ValueError):
-        return "error", "路径格式无效，请检查输入"
+        return "error", "目录路径格式无效，请检查输入"
+
+    if not name_text:
+        if parent.exists() and not parent.is_dir():
+            return "error", f"不是有效文件夹：{parent}"
+        return "warn", f"请输入项目名称，将在「{parent}」下创建子文件夹"
+
+    safe_name = sanitize_project_name(name_text)
+    if not safe_name:
+        return "error", "项目名称无效，请避免使用 \\ / : * ? \" < > | 等字符"
+
+    root = parent / safe_name
+    if parent.exists() and not parent.is_dir():
+        return "error", f"不是有效文件夹：{parent}"
     if root.exists() and any(root.iterdir()):
-        return "warn", f"文件夹非空：{root}"
+        return "warn", f"项目文件夹已存在且非空：{root}"
     if root.exists():
-        return "ready", f"文件夹为空，可在此创建项目：{root}"
-    parent = root.parent
+        return "ready", f"将在此空文件夹中创建项目：{root}"
     if not parent.exists():
-        return "warn", f"上级目录不存在，创建时将尝试新建：{root}"
-    return "ready", f"将创建新项目文件夹：{root}"
+        return "ready", f"将创建项目文件夹：{root}"
+    return "ready", f"将创建项目：{root}"
 
 
 def assess_open_project_path(path: str) -> Tuple[PathStatus, str]:
@@ -249,30 +266,39 @@ def render_open_project_path_input(
 def render_new_project_path_input(
     *,
     path_key: str = "new_path_input",
+    project_name_key: str = "new_project_name",
     browse_key: str = "browse_new",
     create_key: str = "create_project",
     on_queue_path: Callable[[str], None],
     compact: bool = False,
-) -> Tuple[str, PathStatus, str]:
-    """新建项目路径输入，返回 (path, status, message)。"""
+) -> Tuple[str, str, PathStatus, str]:
+    """新建项目表单，返回 (父目录, 项目名称, status, message)。"""
     if not compact:
-        st.markdown("**新建项目保存位置**")
-        st.caption("选择空文件夹，或输入尚未存在的路径")
+        st.markdown("**新建项目**")
+        st.caption("选择目录并在其下创建以项目名命名的子文件夹")
 
-    new_path = st.text_input(
-        "保存位置",
-        placeholder=r"D:\projects\new_chart",
-        key=path_key,
+    project_name = st.text_input(
+        "项目名称",
+        placeholder="例如：实验组折线图",
+        key=project_name_key,
         label_visibility="collapsed" if compact else "visible",
     )
 
-    status, msg = assess_new_project_path(new_path)
+    new_path = st.text_input(
+        "保存目录",
+        placeholder=r"D:\projects",
+        key=path_key,
+        label_visibility="collapsed" if compact else "visible",
+        help="项目将创建在该目录下的「项目名称」子文件夹中",
+    )
+
+    status, msg = assess_new_project_path(new_path, project_name)
     _render_status_badge(status, msg)
 
-    if st.button("浏览文件夹", key=browse_key, use_container_width=True):
-        picked = _pick_folder_dialog("选择新建项目的目标文件夹")
+    if st.button("浏览目录", key=browse_key, use_container_width=True):
+        picked = _pick_folder_dialog("选择要在其中创建项目的目录")
         if picked:
             on_queue_path(picked)
             st.rerun()
 
-    return new_path, status, msg
+    return new_path, project_name, status, msg

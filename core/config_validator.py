@@ -89,7 +89,9 @@ def validate_config_for_save(
     if render_probe is not None:
         try:
             fig = render_probe(config)
-            if fig is None:
+            if fig is True:
+                pass
+            elif fig is None:
                 issues.append(
                     ValidationIssue("error", "render", "绘图函数未返回有效图表对象。")
                 )

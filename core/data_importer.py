@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import hashlib
 import io
+import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -20,6 +21,7 @@ from core.series_sync import (
     assign_line_keys,
     rebuild_series_config,
 )
+from core.template_registry import get_template_kind
 
 
 def read_uploaded_file(uploaded) -> Optional[pd.DataFrame]:
@@ -47,12 +49,31 @@ def read_uploaded_file(uploaded) -> Optional[pd.DataFrame]:
 def save_dataframe_to_project(project_root: Path, df: pd.DataFrame, filename: str) -> Path:
     data_dir = project_root / "data"
     data_dir.mkdir(parents=True, exist_ok=True)
-    out = data_dir / filename
-    if filename.lower().endswith('.csv'):
+    safe_name = sanitize_data_filename(filename)
+    out = data_dir / safe_name
+    if safe_name.lower().endswith(".csv"):
         df.to_csv(out, index=False,encoding="utf-8-sig")
     else:
         df.to_excel(out, index=False)
     return out
+
+
+def sanitize_data_filename(filename: str) -> str:
+    name = Path(filename or "imported_data.csv").name
+    stem = re.sub(r'[<>:"/\\|?*\x00-\x1f]+', "_", Path(name).stem).strip(" ._")
+    suffix = Path(name).suffix.lower()
+    if suffix == ".xls":
+        suffix = ".xlsx"
+    if suffix not in (".csv", ".xlsx"):
+        suffix = ".csv"
+    return f"{stem or 'imported_data'}{suffix}"
+
+
+def _relative_to_project(path: Path, project_root: Path) -> str:
+    try:
+        return path.resolve().relative_to(project_root.resolve()).as_posix()
+    except ValueError:
+        return str(path.resolve())
 
 
 def build_line_data(
@@ -151,15 +172,16 @@ def build_data_from_mapping(
     template_id: str,
     mapping: Dict[str, Any],
 ) -> Tuple[dict, Dict[str, str], List[str]]:
-    if template_id in ("line_chart_basic", "line_chart_report", "line_chart"):
+    kind = get_template_kind(template_id)
+    if kind == "line":
         return build_line_data(df, mapping["x_col"], mapping["y_cols"])
-    if template_id in ("bar_chart_basic", "horizontal_bar_chart"):
+    if kind == "bar":
         return build_bar_data(df, mapping["cat_col"], mapping["val_col"])
-    if template_id == "scatter_chart_basic":
+    if kind == "scatter":
         return build_scatter_data(
             df, mapping["x_col"], mapping["y_col"], mapping.get("group_col") or None
         )
-    if template_id == "heatmap_basic":
+    if kind == "heatmap":
         mode = mapping.get("mode", "correlation")
         if mode == "correlation":
             return build_heatmap_correlation(df, mapping["numeric_cols"])
@@ -179,6 +201,29 @@ def _show_coercion_warnings(warnings: List[str]) -> None:
 def _columns_schema_hash(columns: List[str]) -> str:
     payload = "|".join(sorted(str(c) for c in columns))
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
+
+
+def _build_data_source_metadata(
+    df: pd.DataFrame,
+    template_id: str,
+    mapping: Dict[str, Any],
+    *,
+    upload_name: str,
+    saved_path: Optional[Path],
+    project_root: Optional[Path],
+) -> Dict[str, Any]:
+    source: Dict[str, Any] = {
+        "type": "uploaded_file",
+        "original_name": upload_name,
+        "template_id": template_id,
+        "mapping": mapping,
+        "columns": [str(c) for c in df.columns],
+        "schema_hash": _columns_schema_hash([str(c) for c in df.columns]),
+        "row_count": int(len(df)),
+    }
+    if saved_path is not None and project_root is not None:
+        source["path"] = _relative_to_project(saved_path, project_root)
+    return source
 
 
 def _mapping_state_keys(prefix: str) -> List[str]:
@@ -201,6 +246,7 @@ def _clear_upload_session(prefix: str) -> None:
     for key in (
         f"{prefix}_dataframe",
         f"{prefix}_upload_name",
+        f"{prefix}_saved_data_path",
         f"{prefix}_schema_hash",
         f"{prefix}_upload",
         *_mapping_state_keys(prefix),
@@ -279,7 +325,9 @@ def render_data_panel(
     mapping: Dict[str, Any] = {}
     result = config
 
-    if template_id in ("line_chart_basic", "line_chart_report", "line_chart"):
+    kind = get_template_kind(template_id)
+
+    if kind == "line":
         mapping["x_col"] = st.selectbox("X 轴列", cols, key=f"{prefix}_x")
         mapping["y_cols"] = st.multiselect(
             "Y 轴列（可多选）",
@@ -287,7 +335,7 @@ def render_data_panel(
             default=[c for c in numeric_cols if c != mapping["x_col"]][:2],
             key=f"{prefix}_ys",
         )
-    elif template_id in ("bar_chart_basic", "horizontal_bar_chart"):
+    elif kind == "bar":
         mapping["cat_col"] = st.selectbox("类别列", cols, key=f"{prefix}_cat")
         val_choices = numeric_cols or cols
         mapping["val_col"] = st.selectbox(
@@ -296,7 +344,7 @@ def render_data_panel(
             index=val_choices.index(numeric_cols[0]) if numeric_cols else 0,
             key=f"{prefix}_val",
         )
-    elif template_id == "scatter_chart_basic":
+    elif kind == "scatter":
         mapping["x_col"] = st.selectbox("X 列", cols, key=f"{prefix}_sx")
         y_choices = [c for c in cols if c != mapping["x_col"]]
         mapping["y_col"] = st.selectbox("Y 列", y_choices, key=f"{prefix}_sy")
@@ -305,7 +353,7 @@ def render_data_panel(
         ]
         g = st.selectbox("分组列（可选）", group_opts, key=f"{prefix}_sg")
         mapping["group_col"] = None if g == "（不分组）" else g
-    elif template_id == "heatmap_basic":
+    elif kind == "heatmap":
         mode = st.radio(
             "热力图数据来源",
             ["从数值列生成相关矩阵", "自定义矩阵（行标签 + 多列数值）"],
@@ -346,9 +394,8 @@ def render_data_panel(
 
     if save_file_btn and project_root and df is not None:
         fname = st.session_state.get(f"{prefix}_upload_name", "imported_data.csv")
-        if not fname.lower().endswith( (".csv", ".xlsx")):
-            fname = "imported_data.csv"
         path = save_dataframe_to_project(project_root, df, fname)
+        st.session_state[f"{prefix}_saved_data_path"] = str(path)
         st.success(f"已保存：{path.name}")
 
     if apply_btn:
@@ -369,7 +416,26 @@ def render_data_panel(
                 df, template_id, mapping
             )
             _show_coercion_warnings(coerce_warnings)
+            saved_path = None
+            upload_name = st.session_state.get(f"{prefix}_upload_name", "imported_data.csv")
+            if project_root is not None:
+                remembered = st.session_state.get(f"{prefix}_saved_data_path")
+                saved_path = Path(remembered) if remembered else save_dataframe_to_project(
+                    project_root, df, upload_name
+                )
             result = set_by_path(config, "data", new_data)
+            result = set_by_path(
+                result,
+                "data_source",
+                _build_data_source_metadata(
+                    df,
+                    template_id,
+                    mapping,
+                    upload_name=upload_name,
+                    saved_path=saved_path,
+                    project_root=project_root,
+                ),
+            )
             result = rebuild_series_config(result, new_data, template_id, labels_map)
             st.success("数据已写入当前配置，记得点击「保存当前配置」。")
             render_data_preview(new_data, template_id, show_json=show_json)

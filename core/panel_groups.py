@@ -5,7 +5,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional
 
 import streamlit as st
 
@@ -14,100 +14,90 @@ from core.config_utils import find_paths, get_by_path, path_exists, set_by_path
 from core.data_importer import render_data_panel
 from core.semantic_widgets import render_canvas_size, render_field_widget, render_font_settings
 from core.style_presets import render_style_presets
-
-# 各模板允许的简洁模式分组（白名单）
-TEMPLATE_GROUP_WHITELIST: Dict[str, Set[str]] = {
-    "line_chart_basic": {
-        "数据导入", "风格预设", "基础信息", "画布尺寸", "字体设置", "坐标轴", "图例", "线条样式",
-        "颜色设置", "数据标签", "自定义文字位置", "导出设置",
-    },
-    "line_chart_report": {
-        "数据导入", "风格预设", "基础信息", "画布尺寸", "字体设置", "坐标轴", "图例", "线条样式",
-        "颜色设置", "数据标签", "自定义文字位置", "导出设置",
-    },
-    "line_chart": {
-        "数据导入", "风格预设", "基础信息", "画布尺寸", "字体设置", "坐标轴", "图例", "线条样式",
-        "颜色设置", "导出设置",
-    },
-    "bar_chart_basic": {
-        "数据导入", "风格预设", "基础信息", "画布尺寸", "字体设置", "坐标轴", "图例", "柱状图样式",
-        "颜色设置", "数据标签", "导出设置",
-    },
-    "horizontal_bar_chart": {
-        "数据导入", "风格预设", "基础信息", "画布尺寸", "字体设置", "坐标轴", "柱状图样式",
-        "颜色设置", "数据标签", "导出设置",
-    },
-    "heatmap_basic": {
-        "数据导入", "风格预设", "基础信息", "画布尺寸", "字体设置", "坐标轴", "热力图样式", "导出设置",
-    },
-    "scatter_chart_basic": {
-        "数据导入", "风格预设", "基础信息", "画布尺寸", "字体设置", "坐标轴", "图例", "散点样式",
-        "颜色设置", "导出设置",
-    },
-}
+from core.template_registry import (
+    GROUP_AXES,
+    GROUP_BAR,
+    GROUP_BASIC,
+    GROUP_CANVAS,
+    GROUP_COLORS,
+    GROUP_CUSTOM_TEXT,
+    GROUP_DATA,
+    GROUP_EXPORT,
+    GROUP_FONT,
+    GROUP_HEATMAP,
+    GROUP_LABELS,
+    GROUP_LEGEND,
+    GROUP_LINE,
+    GROUP_SCATTER,
+    GROUP_STYLE,
+    get_simple_groups,
+)
 
 SIMPLE_MODE_GROUPS: List[Dict[str, Any]] = [
-    {"title": "数据导入", "data_import": True},
-    {"title": "风格预设", "style_presets": True},
-    {"title": "基础信息", "paths": ["chart.title", "chart.subtitle"]},
+    {"title": GROUP_DATA, "data_import": True},
+    {"title": GROUP_STYLE, "style_presets": True},
+    {"title": GROUP_BASIC, "paths": ["chart.title", "chart.subtitle"]},
     {
-        "title": "画布尺寸",
+        "title": GROUP_CANVAS,
         "canvas_pair": ("figure.width", "figure.height"),
         "canvas_pair_alt": ("chart.width", "chart.height"),
     },
     {
-        "title": "字体设置",
+        "title": GROUP_FONT,
         "font_settings": True,
         "paths": [],
     },
     {
-        "title": "坐标轴",
+        "title": GROUP_AXES,
         "paths": [
             "axes.x_label", "axes.y_label", "axes.grid", "axes.grid_alpha", "axes.spine_visible",
         ],
         "axis_limits": True,
     },
     {
-        "title": "图例",
+        "title": GROUP_LEGEND,
         "paths": [
             "legend.show", "legend.loc", "legend.frameon", "legend.fontsize", "custom_text.legend_xy",
         ],
     },
     {
-        "title": "线条样式",
+        "title": GROUP_LINE,
         "paths": [
             "line_style.width", "line_style.line_width", "line_style.marker_size",
             "line_style.marker", "line_style.marker_edge_width", "line_style.alpha",
         ],
     },
     {
-        "title": "柱状图样式",
+        "title": GROUP_BAR,
         "paths": ["bar_style.width", "bar_style.edge_width", "bar_style.alpha"],
     },
     {
-        "title": "散点样式",
+        "title": GROUP_SCATTER,
         "paths": ["scatter_style.size", "scatter_style.alpha", "scatter_style.edge_width"],
     },
     {
-        "title": "热力图样式",
+        "title": GROUP_HEATMAP,
         "paths": ["heatmap.cmap", "heatmap.annot", "heatmap.linewidth", "heatmap.colorbar"],
     },
-    {"title": "颜色设置", "glob": "series.*.color"},
+    {"title": GROUP_COLORS, "glob": "series.*.color"},
     {
-        "title": "数据标签",
+        "title": GROUP_LABELS,
         "paths": ["data_labels.show", "data_labels.fontsize", "data_labels.offset",
                   "data_labels.decimals", "data_labels.prefix", "data_labels.suffix"],
         "glob_extra": ["series.*.label", "series.*.label_offset"],
     },
-    {"title": "自定义文字位置", "paths": ["custom_text.title_xy"]},
-    {"title": "导出设置", "paths": ["export.dpi", "export.transparent", "chart.dpi"]},
+    {"title": GROUP_CUSTOM_TEXT, "paths": ["custom_text.title_xy"]},
+    {"title": GROUP_EXPORT, "paths": ["export.dpi", "export.transparent", "chart.dpi"]},
 ]
 
 
 def _group_allowed(group: Dict[str, Any], template_id: Optional[str]) -> bool:
-    if not template_id or template_id not in TEMPLATE_GROUP_WHITELIST:
+    if not template_id:
         return True
-    return group["title"] in TEMPLATE_GROUP_WHITELIST[template_id]
+    allowed = get_simple_groups(template_id)
+    if allowed is None:
+        return True
+    return group["title"] in allowed
 
 
 def _group_has_fields(config: Dict[str, Any], group: Dict[str, Any]) -> bool:
@@ -155,7 +145,7 @@ def render_simple_panel(
             continue
 
         expanded_default = group["title"] in (
-            "数据导入", "风格预设", "基础信息", "画布尺寸", "字体设置",
+            GROUP_DATA, GROUP_STYLE, GROUP_BASIC, GROUP_CANVAS, GROUP_FONT,
         )
         with st.expander(group["title"], expanded=expanded_default):
             if group.get("data_import"):

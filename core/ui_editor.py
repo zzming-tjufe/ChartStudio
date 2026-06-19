@@ -35,7 +35,7 @@ def render_editor_sidebar(
     widget_prefix: str,
     unsaved: bool,
     on_load: Callable[[str], None],
-    on_create: Callable[[str, str], None],
+    on_create: Callable[[str, str, str | None], None],
     on_reload: Callable[[], None],
     on_reload_core: Callable[[], None],
     on_reset: Callable[[], None],
@@ -74,18 +74,23 @@ def render_editor_sidebar(
             )
         with tab_new2:
             render_template_gallery(key_prefix="sidebar_gallery2")
-            new_path2, _, _ = render_new_project_path_input(
+            new_path2, project_name2, _, _ = render_new_project_path_input(
                 path_key="sidebar_new_path",
+                project_name_key="sidebar_new_project_name",
                 browse_key="sidebar_browse_new",
                 on_queue_path=on_queue_new_path,
                 compact=True,
             )
             if st.button("新建并切换", key="sidebar_create", use_container_width=True):
-                if new_path2.strip():
-                    tpl = st.session_state.get("new_template", "line_chart_basic")
-                    on_create(new_path2.strip(), tpl)
+                from core.path_utils import sanitize_project_name
+
+                if not new_path2.strip():
+                    st.session_state.last_error = "请先输入保存目录"
+                elif not sanitize_project_name(project_name2):
+                    st.session_state.last_error = "请输入有效的项目名称"
                 else:
-                    st.session_state.last_error = "请先输入保存位置"
+                    tpl = st.session_state.get("new_template", "line_chart_basic")
+                    on_create(new_path2.strip(), tpl, project_name2.strip())
 
         if st.button("重新加载项目", key="reload_project", use_container_width=True):
             on_reload()
@@ -234,6 +239,7 @@ def render_editor_actions(
     on_snapshot: Callable[[], None],
     on_reset: Callable[[], None],
     on_restore_snapshot: Callable[[dict], None],
+    render_probe: Callable | None = None,
 ) -> None:
     st.markdown("##### 图表检查")
     with st.container(border=True):
@@ -306,7 +312,7 @@ def render_editor_actions(
     with s1:
         if st.button("保存当前配置", use_container_width=True, type="primary"):
             issues = validate_config_for_save(
-                cfg, info.template_id, render_probe=render_chart
+                cfg, info.template_id, render_probe=render_probe or render_chart
             )
             if has_blocking_errors(issues):
                 st.session_state[_PENDING_SAVE_KEY] = [

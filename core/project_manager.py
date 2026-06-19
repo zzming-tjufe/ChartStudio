@@ -10,6 +10,10 @@ from pathlib import Path
 from typing import List, Optional, Tuple
 
 from core.config_loader import load_yaml
+from core.template_registry import (
+    DEFAULT_TEMPLATE_IDS,
+    get_template_display_name,
+)
 
 TEMPLATES_DIR = Path(__file__).resolve().parent.parent / "templates"
 LEGACY_TEMPLATES_DIR = TEMPLATES_DIR / "_legacy"
@@ -17,26 +21,6 @@ DEFAULT_TEMPLATE = "line_chart_basic"
 
 REQUIRED_FILES = ("chart_config.yaml", "chart_core.py")
 OPTIONAL_FILES = ("chart_project.yaml",)
-
-# 默认模板列表（不含旧版）
-DEFAULT_TEMPLATE_IDS = [
-    "line_chart_basic",
-    "line_chart_report",
-    "bar_chart_basic",
-    "horizontal_bar_chart",
-    "heatmap_basic",
-    "scatter_chart_basic",
-]
-
-TEMPLATE_DISPLAY_NAMES = {
-    "line_chart": "多折线图（旧版 · 兼容）",
-    "line_chart_basic": "基础折线图",
-    "line_chart_report": "报告风格多折线图",
-    "bar_chart_basic": "基础柱状图",
-    "horizontal_bar_chart": "横向柱状图",
-    "heatmap_basic": "基础热力图",
-    "scatter_chart_basic": "基础散点图",
-}
 
 
 @dataclass
@@ -51,7 +35,7 @@ class ProjectInfo:
     @property
     def template_name(self) -> str:
         tpl = self.meta.get("template", "")
-        return TEMPLATE_DISPLAY_NAMES.get(tpl, tpl or "未知模板")
+        return get_template_display_name(tpl) if tpl else "未知模板"
 
     @property
     def display_name(self) -> str:
@@ -78,7 +62,7 @@ def get_templates(include_legacy: bool = False) -> List[str]:
 
 def get_template_choices(include_legacy: bool = False) -> List[tuple[str, str]]:
     ids = get_templates(include_legacy=include_legacy)
-    return [(tid, TEMPLATE_DISPLAY_NAMES.get(tid, tid)) for tid in ids]
+    return [(tid, get_template_display_name(tid)) for tid in ids]
 
 
 def validate_project(path: str | Path) -> Tuple[bool, str, Optional[ProjectInfo]]:
@@ -130,19 +114,34 @@ def _resolve_template_path(template_name: str) -> Optional[Path]:
 
 
 def create_project(
-    target_dir: str | Path,
+    parent_dir: str | Path,
     template_name: str = DEFAULT_TEMPLATE,
     project_name: Optional[str] = None,
 ) -> Tuple[bool, str, Optional[ProjectInfo]]:
-    root = _resolve_path(target_dir)
+    """
+    在 parent_dir 下创建以项目名命名的子文件夹，并写入模板内容。
+
+    parent_dir: 用户选定的父目录
+    project_name: 子文件夹名（同时写入 chart_project.yaml 的 name）
+    """
+    from core.path_utils import default_project_folder_name, resolve_project_root, sanitize_project_name
+
+    parent = _resolve_path(parent_dir)
     template_path = _resolve_template_path(template_name)
 
     if template_path is None:
         return False, f"模板不存在：{template_name}", None
 
-    if root.exists() and any(root.iterdir()):
-        return False, f"目标文件夹非空，请选择空文件夹：{root}", None
+    folder_name = sanitize_project_name(project_name or "") or default_project_folder_name(template_name)
+    try:
+        root = resolve_project_root(parent, folder_name)
+    except ValueError as exc:
+        return False, str(exc), None
 
+    if root.exists() and any(root.iterdir()):
+        return False, f"项目文件夹已存在且非空：{root}", None
+
+    parent.mkdir(parents=True, exist_ok=True)
     root.mkdir(parents=True, exist_ok=True)
 
     for filename in ("chart_config.yaml", "chart_core.py", "chart_project.yaml"):
@@ -153,14 +152,13 @@ def create_project(
     for sub in ("data", "fonts", "output", "configs"):
         (root / sub).mkdir(exist_ok=True)
 
-    if project_name:
-        project_yaml = root / "chart_project.yaml"
-        if project_yaml.is_file():
-            from core.config_loader import save_yaml
+    project_yaml = root / "chart_project.yaml"
+    if project_yaml.is_file():
+        from core.config_loader import save_yaml
 
-            meta = load_yaml(project_yaml)
-            meta["name"] = project_name
-            save_yaml(project_yaml, meta)
+        meta = load_yaml(project_yaml)
+        meta["name"] = sanitize_project_name(project_name or "") or folder_name
+        save_yaml(project_yaml, meta)
 
     ok, msg, info = validate_project(root)
     if ok:

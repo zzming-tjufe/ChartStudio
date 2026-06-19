@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import sys
 import traceback
+import hashlib
+import json
 from datetime import datetime
 from pathlib import Path
 
@@ -20,7 +22,7 @@ if str(APP_ROOT) not in sys.path:
 
 from core.ai_prompt import get_ai_prompt
 from core.app_state import get_app_state
-from core.config_loader import deep_copy_config, load_yaml, save_yaml
+from core.config_loader import deep_copy_config, load_yaml, save_yaml, strip_internal_keys
 from core.config_migrate import normalize_config
 from core.config_utils import get_by_path, _MISSING
 from core.diff_utils import has_changes
@@ -141,6 +143,8 @@ def _init_session_state() -> None:
         "render_error": None,
         "render_trace": None,
         "render_status": None,
+        "last_render_fingerprint": None,
+        "last_render_succeeded": False,
         "status_message": None,
         "panel_mode": "简洁模式",
         "open_path_input": "",
@@ -221,6 +225,8 @@ def _load_project(project_path: str) -> None:
     st.session_state.render_error = None
     st.session_state.render_trace = None
     st.session_state.render_status = None
+    st.session_state.last_render_fingerprint = None
+    st.session_state.last_render_succeeded = False
     st.session_state.migration_notes = migration_notes
     if migration_notes:
         st.session_state.status_message = (
@@ -270,6 +276,8 @@ def _close_project() -> None:
     st.session_state.render_error = None
     st.session_state.render_trace = None
     st.session_state.render_status = None
+    st.session_state.last_render_fingerprint = None
+    st.session_state.last_render_succeeded = False
     st.session_state.migration_notes = []
     st.session_state.status_message = "已关闭项目"
     st.session_state.last_error = None
@@ -368,6 +376,16 @@ def _prepare_render_config(config: dict) -> dict:
     return render_cfg
 
 
+def _config_fingerprint(config: dict) -> str:
+    payload = json.dumps(
+        strip_internal_keys(config),
+        ensure_ascii=False,
+        sort_keys=True,
+        default=str,
+    )
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
 def _get_export_settings(config: dict) -> tuple[int | None, bool]:
     dpi_val = get_by_path(config, "export.dpi")
     if dpi_val is _MISSING:
@@ -383,6 +401,7 @@ def _render_chart(config: dict):
     if draw_fn is None:
         return None
 
+    fingerprint = _config_fingerprint(config)
     render_cfg = _prepare_render_config(config)
     font_bundle = prepare_chart_fonts(render_cfg)
     try:
@@ -392,11 +411,15 @@ def _render_chart(config: dict):
             st.session_state.render_error = "绘图函数未返回有效图表，请检查绘图核心文件。"
             st.session_state.render_trace = None
             st.session_state.render_status = "error"
+            st.session_state.last_render_fingerprint = fingerprint
+            st.session_state.last_render_succeeded = False
             return None
         apply_chart_fonts(fig, font_bundle, render_cfg.get("font", {}))
         st.session_state.render_error = None
         st.session_state.render_trace = None
         st.session_state.render_status = "success"
+        st.session_state.last_render_fingerprint = fingerprint
+        st.session_state.last_render_succeeded = True
         _, transparent = _get_export_settings(config)
         if transparent:
             fig.patch.set_alpha(0.0)
@@ -407,7 +430,18 @@ def _render_chart(config: dict):
         st.session_state.render_error = f"图表渲染失败：{type(exc).__name__} — {exc}"
         st.session_state.render_trace = traceback.format_exc()
         st.session_state.render_status = "error"
+        st.session_state.last_render_fingerprint = fingerprint
+        st.session_state.last_render_succeeded = False
         return None
+
+
+def _render_probe_for_save(config: dict):
+    if (
+        st.session_state.get("last_render_succeeded")
+        and st.session_state.get("last_render_fingerprint") == _config_fingerprint(config)
+    ):
+        return True
+    return _render_chart(config)
 
 
 def _get_canvas_size(config: dict) -> str:
@@ -522,7 +556,7 @@ with st.sidebar:
             widget_prefix=get_project_widget_prefix(str(_info_sidebar.root)),
             unsaved=_unsaved(),
             on_load=_handle_open,
-            on_create=lambda path, tpl: _try_create_project(path, tpl),
+            on_create=lambda path, tpl, name=None: _try_create_project(path, tpl, name),
             on_reload=_request_reload,
             on_reload_core=_handle_reload_core,
             on_reset=_request_reset,
@@ -627,6 +661,7 @@ elif app_state == "editing" and info and cfg:
         unsaved=_unsaved(),
         get_export_settings=_get_export_settings,
         render_chart=_render_chart,
+        render_probe=_render_probe_for_save,
         on_save=_save_config,
         on_snapshot=_save_snapshot,
         on_reset=_request_reset,
