@@ -1,4 +1,17 @@
 # 基础折线图配置
+schema_version: 2
+template_id: line_chart_basic
+chartstudio_version: "0.2.0"
+
+layout:
+  left: 0.12
+  right: 0.95
+  bottom: 0.16
+  top: 0.88
+  use_tight_layout: false
+
+annotations: []
+
 chart:
   title: "基础折线图"
   subtitle: ""
@@ -10,6 +23,7 @@ figure:
 export:
   dpi: 150
   transparent: false
+  bbox: fixed
 
 font:
   zh_name: "微软雅黑"

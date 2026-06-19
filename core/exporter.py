@@ -81,9 +81,16 @@ def export_figure(
 
     save_kwargs: dict = {
         "format": fmt,
-        "bbox_inches": "tight",
         "transparent": transparent,
     }
+
+    bbox_mode = "fixed"
+    if config is not None:
+        export_cfg = config.get("export", {})
+        if isinstance(export_cfg, dict):
+            bbox_mode = str(export_cfg.get("bbox", "fixed") or "fixed").strip().lower()
+    if bbox_mode == "tight":
+        save_kwargs["bbox_inches"] = "tight"
     if fmt == "png":
         save_kwargs["dpi"] = dpi or fig.get_dpi()
 

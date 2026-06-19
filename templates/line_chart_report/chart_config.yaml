@@ -1,3 +1,16 @@
+schema_version: 2
+template_id: line_chart_report
+chartstudio_version: "0.2.0"
+
+layout:
+  left: 0.12
+  right: 0.95
+  bottom: 0.16
+  top: 0.88
+  use_tight_layout: false
+
+annotations: []
+
 chart:
   title: "实验结果对比报告"
   subtitle: "2024 年度数据统计"
@@ -9,6 +22,7 @@ figure:
 export:
   dpi: 300
   transparent: false
+  bbox: fixed
 
 font:
   zh_name: "微软雅黑"

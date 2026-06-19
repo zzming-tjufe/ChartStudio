@@ -7,9 +7,11 @@ from typing import Any, Dict, List
 import matplotlib.pyplot as plt
 
 
+from core.annotations import apply_annotations
 from core.axis_limits import apply_axis_limits
 from core.bar_colors import bar_colors_for_categories
 from core.data_label_format import format_data_label
+from core.layout import apply_layout
 
 
 def _bar_colors(config: Dict[str, Any], categories: List[str]) -> List[str]:
@@ -65,5 +67,6 @@ def draw_chart(config: Dict[str, Any]):
             )
 
     apply_axis_limits(ax, axes_cfg)
-    fig.tight_layout()
+    apply_layout(fig, config)
+    apply_annotations(fig, ax, config.get("annotations", []))
     return fig

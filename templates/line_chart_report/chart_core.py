@@ -6,8 +6,10 @@ from typing import Any, Dict, List
 
 import matplotlib.pyplot as plt
 
+from core.annotations import apply_annotations
 from core.axis_limits import apply_axis_limits
 from core.data_label_format import format_data_label
+from core.layout import apply_layout
 
 
 def _series_keys(data: Dict[str, Any]) -> List[str]:
@@ -97,5 +99,6 @@ def draw_chart(config: Dict[str, Any]):
 
     _apply_data_labels(ax, config, series_cfg)
     apply_axis_limits(ax, axes_cfg)
-    fig.tight_layout()
+    apply_layout(fig, config)
+    apply_annotations(fig, ax, config.get("annotations", []))
     return fig

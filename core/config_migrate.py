@@ -7,8 +7,8 @@ from __future__ import annotations
 from copy import deepcopy
 from typing import Any, Dict, List, Tuple
 
-
 from core.constants import CHARTSTUDIO_VERSION, SCHEMA_VERSION
+from core.layout import DEFAULT_LAYOUT
 
 
 def ensure_schema_metadata(
@@ -16,13 +16,43 @@ def ensure_schema_metadata(
     template_id: str = "",
 ) -> Dict[str, Any]:
     """写入/补全 schema_version、template_id、chartstudio_version。"""
-    if "schema_version" not in config:
-        config["schema_version"] = SCHEMA_VERSION
+    config["schema_version"] = SCHEMA_VERSION
     if template_id and not config.get("template_id"):
         config["template_id"] = template_id
     if "chartstudio_version" not in config:
         config["chartstudio_version"] = CHARTSTUDIO_VERSION
     return config
+
+
+def _ensure_layout(cfg: Dict[str, Any]) -> None:
+    layout = cfg.get("layout")
+    if not isinstance(layout, dict):
+        layout = {}
+        cfg["layout"] = layout
+    for key, default in DEFAULT_LAYOUT.items():
+        if key not in layout:
+            layout[key] = default
+
+
+def _ensure_export(cfg: Dict[str, Any], notes: List[str]) -> None:
+    if "export" not in cfg:
+        cfg["export"] = {"dpi": 150, "transparent": False, "bbox": "fixed"}
+        notes.append("已补齐 export 段（dpi / transparent / bbox）")
+        return
+
+    export = cfg["export"]
+    if not isinstance(export, dict):
+        cfg["export"] = {"dpi": 150, "transparent": False, "bbox": "fixed"}
+        notes.append("export 段无效，已重置为默认值")
+        return
+
+    if "dpi" not in export:
+        export["dpi"] = 150
+    if "transparent" not in export:
+        export["transparent"] = False
+    if "bbox" not in export:
+        export["bbox"] = "fixed"
+        notes.append("已为 export 补齐 bbox: fixed")
 
 
 def normalize_config(
@@ -42,7 +72,6 @@ def normalize_config(
     chart = cfg.get("chart")
     if isinstance(chart, dict):
         figure = cfg.setdefault("figure", {})
-        export = cfg.setdefault("export", {})
 
         if "width" in chart:
             if "width" not in figure:
@@ -59,6 +88,7 @@ def normalize_config(
                 chart.pop("height", None)
 
         if "dpi" in chart:
+            export = cfg.setdefault("export", {})
             if "dpi" not in export:
                 export["dpi"] = chart.pop("dpi")
                 notes.append("已将 chart.dpi 迁移到 export.dpi")
@@ -71,12 +101,13 @@ def normalize_config(
             line_style["width"] = line_style.pop("line_width")
             notes.append("已将 line_style.line_width 迁移到 line_style.width")
 
-    if "export" not in cfg:
-        cfg["export"] = {"dpi": 150, "transparent": False}
-    else:
-        export = cfg["export"]
-        if "transparent" not in export:
-            export["transparent"] = False
+    _ensure_export(cfg, notes)
+    _ensure_layout(cfg)
+
+    if "annotations" not in cfg or not isinstance(cfg.get("annotations"), list):
+        cfg["annotations"] = []
+        if "annotations" in config and not isinstance(config.get("annotations"), list):
+            notes.append("annotations 无效，已重置为空列表")
 
     font = cfg.get("font")
     if isinstance(font, dict):
@@ -105,7 +136,10 @@ def normalize_config(
         if "suffix" not in data_labels:
             data_labels["suffix"] = ""
 
+    prev_schema = config.get("schema_version")
     ensure_schema_metadata(cfg, template_id=template_id)
+    if prev_schema is not None and prev_schema != SCHEMA_VERSION:
+        notes.append(f"已将 schema_version 从 {prev_schema} 升级到 {SCHEMA_VERSION}")
 
     return cfg, notes
 
@@ -117,5 +151,12 @@ def is_legacy_structure(config: Dict[str, Any]) -> bool:
         return True
     line_style = config.get("line_style", {})
     if isinstance(line_style, dict) and "line_width" in line_style:
+        return True
+    if config.get("schema_version") != SCHEMA_VERSION:
+        return True
+    export = config.get("export", {})
+    if isinstance(export, dict) and "bbox" not in export:
+        return True
+    if "layout" not in config:
         return True
     return False

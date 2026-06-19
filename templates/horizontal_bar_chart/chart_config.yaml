@@ -1,3 +1,16 @@
+schema_version: 2
+template_id: horizontal_bar_chart
+chartstudio_version: "0.2.0"
+
+layout:
+  left: 0.12
+  right: 0.95
+  bottom: 0.16
+  top: 0.88
+  use_tight_layout: false
+
+annotations: []
+
 chart:
   title: "指标完成度排名"
   subtitle: ""
@@ -9,6 +22,7 @@ figure:
 export:
   dpi: 200
   transparent: false
+  bbox: fixed
 
 font:
   zh_name: "微软雅黑"

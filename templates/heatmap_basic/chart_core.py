@@ -7,8 +7,10 @@ from typing import Any, Dict
 import matplotlib.pyplot as plt
 import numpy as np
 
+from core.annotations import apply_annotations
 from core.axis_limits import apply_axis_limits
 from core.data_label_format import format_data_label
+from core.layout import apply_layout
 
 
 def draw_chart(config: Dict[str, Any]):
@@ -74,5 +76,6 @@ def draw_chart(config: Dict[str, Any]):
         fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
 
     apply_axis_limits(ax, axes_cfg)
-    fig.tight_layout()
+    apply_layout(fig, config)
+    apply_annotations(fig, ax, config.get("annotations", []))
     return fig
