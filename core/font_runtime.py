@@ -11,10 +11,16 @@ from typing import Any, Dict, Optional
 import matplotlib.pyplot as plt
 from matplotlib.font_manager import FontProperties, fontManager
 
+from core.font_utils import (
+    font_properties_for_text,
+    resolve_font_properties,
+    resolve_path_on_disk,
+)
 from core.system_fonts import (
     PREFERRED_EN,
     PREFERRED_NUM,
     PREFERRED_ZH,
+    canonical_font_name,
     ensure_font_defaults,
     resolve_font_path_by_name,
     resolve_font_with_priority,
@@ -45,19 +51,7 @@ class FontBundle:
 
 
 def _project_root(config: Dict[str, Any]) -> Path:
-    return Path(config.get("_project_root", "."))
-
-
-def resolve_path_on_disk(path_str: str, project_root: Path) -> Optional[Path]:
-    if not path_str or not str(path_str).strip():
-        return None
-    raw = Path(str(path_str).strip())
-    if raw.is_file():
-        return raw.resolve()
-    for candidate in (project_root / raw, project_root / "fonts" / raw.name):
-        if candidate.is_file():
-            return candidate.resolve()
-    return None
+    return Path(config.get("_project_root", ".")).resolve()
 
 
 def _resolve_role(
@@ -75,17 +69,21 @@ def _resolve_role(
     if role == "zh" and path_override:
         configured_path = path_override
 
-    # 下拉框名称优先：避免 zh_name 已改但 zh_path 仍是旧值
-    if configured_name:
-        by_name = resolve_font_path_by_name(configured_name)
-        if by_name:
-            path = Path(by_name)
-            if path.is_file():
-                return ResolvedFont(configured_name, path.resolve(), False)
-
     disk_path = resolve_path_on_disk(configured_path, project_root)
     if disk_path:
         return ResolvedFont(configured_name or disk_path.stem, disk_path, False)
+
+    if configured_name:
+        lookup_names = [configured_name]
+        canonical = canonical_font_name(configured_name)
+        if canonical and canonical not in lookup_names:
+            lookup_names.append(canonical)
+        for name in lookup_names:
+            by_name = resolve_font_path_by_name(name)
+            if by_name:
+                path = Path(by_name)
+                if path.is_file():
+                    return ResolvedFont(configured_name, path.resolve(), False)
 
     fallback_path = resolve_font_with_priority(configured_name, priority)
     if fallback_path:
@@ -119,9 +117,16 @@ def prepare_chart_fonts(config: Dict[str, Any]) -> FontBundle:
                 had_fallback = True
 
     plt.rcParams["axes.unicode_minus"] = False
-    primary = bundle.zh.path or bundle.en.path or bundle.num.path
-    if primary and primary.is_file():
-        plt.rcParams["font.family"] = FontProperties(fname=str(primary)).get_name()
+    zh_fp = resolve_font_properties(config, "zh", warn=False)
+    if zh_fp is not None:
+        try:
+            fname = zh_fp.get_file()
+        except Exception:
+            fname = None
+        if fname:
+            plt.rcParams["font.family"] = FontProperties(fname=fname).get_name()
+        else:
+            plt.rcParams["font.family"] = zh_fp.get_name()
     else:
         plt.rcParams["font.family"] = "sans-serif"
 
@@ -137,46 +142,72 @@ def pop_font_fallback_warning(config: Dict[str, Any]) -> Optional[str]:
     return config.pop(INTERNAL_WARNING_KEY, None)
 
 
-def _tick_fontproperties(label_text: str, bundle: FontBundle, tick_size: float) -> FontProperties:
-    text = str(label_text)
-    if any("\u4e00" <= ch <= "\u9fff" for ch in text):
-        return bundle.fp("zh", tick_size)
-    stripped = text.strip().replace(".", "").replace("-", "").replace(",", "")
-    if stripped.isdigit():
-        return bundle.fp("num", tick_size)
-    if any(ch.isalpha() for ch in text):
-        return bundle.fp("en", tick_size)
-    return bundle.fp("num", tick_size)
-
-
-def apply_chart_fonts(fig, bundle: FontBundle, font_cfg: Dict[str, Any]) -> None:
+def apply_chart_fonts(
+    fig,
+    config: Dict[str, Any],
+    bundle: Optional[FontBundle] = None,
+) -> None:
     """将 FontProperties 应用到标题、轴标签、刻度、图例与注释。"""
+    font_cfg = config.get("font", {}) if isinstance(config.get("font"), dict) else {}
     title_size = float(font_cfg.get("title_size", 16))
     label_size = float(font_cfg.get("label_size", 12))
     tick_size = float(font_cfg.get("tick_size", 10))
     legend_size = float(font_cfg.get("legend_size", 10))
 
+    zh_title = resolve_font_properties(config, "zh", title_size, warn=False)
+    zh_label = resolve_font_properties(config, "zh", label_size, warn=False)
+    zh_legend = resolve_font_properties(config, "zh", legend_size, warn=False)
+
     for ax in fig.get_axes():
-        if ax.title:
-            ax.title.set_fontproperties(bundle.fp("zh", title_size))
+        if ax.title and zh_title:
+            ax.title.set_fontproperties(zh_title)
         xlabel = ax.xaxis.get_label()
         ylabel = ax.yaxis.get_label()
-        if xlabel:
-            xlabel.set_fontproperties(bundle.fp("zh", label_size))
-        if ylabel:
-            ylabel.set_fontproperties(bundle.fp("zh", label_size))
+        if xlabel and zh_label:
+            xlabel.set_fontproperties(zh_label)
+        if ylabel and zh_label:
+            ylabel.set_fontproperties(zh_label)
 
         for label in ax.get_xticklabels() + ax.get_yticklabels():
-            label.set_fontproperties(_tick_fontproperties(label.get_text(), bundle, tick_size))
+            label.set_fontproperties(
+                font_properties_for_text(
+                    config,
+                    label.get_text(),
+                    zh_size=tick_size,
+                    en_size=tick_size,
+                    num_size=tick_size,
+                )
+            )
 
         legend = ax.get_legend()
-        if legend:
+        if legend and zh_legend:
             for text in legend.get_texts():
-                text.set_fontproperties(bundle.fp("zh", legend_size))
+                text.set_fontproperties(zh_legend)
 
         for text in ax.texts:
-            text.set_fontproperties(bundle.fp("num", tick_size))
+            text.set_fontproperties(
+                font_properties_for_text(
+                    config,
+                    text.get_text(),
+                    zh_size=tick_size,
+                    en_size=tick_size,
+                    num_size=tick_size,
+                )
+            )
 
         for child in ax.get_children():
-            if child.__class__.__name__ == "Annotation":
-                child.set_fontproperties(bundle.fp("num", tick_size))
+            if child.__class__.__name__ != "Annotation":
+                continue
+            try:
+                ann_text = child.get_text()
+            except Exception:
+                ann_text = ""
+            child.set_fontproperties(
+                font_properties_for_text(
+                    config,
+                    ann_text,
+                    zh_size=tick_size,
+                    en_size=tick_size,
+                    num_size=tick_size,
+                )
+            )

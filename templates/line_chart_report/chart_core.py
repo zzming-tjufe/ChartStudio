@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 from core.annotations import apply_annotations
 from core.axis_limits import apply_axis_limits
 from core.data_label_format import format_data_label
+from core.font_utils import apply_legend_fonts, resolve_font_properties
 from core.layout import apply_layout
 
 
@@ -21,6 +22,7 @@ def _apply_data_labels(ax, config: Dict[str, Any], series_cfg: Dict[str, Any]) -
     if not label_cfg.get("show", False):
         return
     fontsize = int(label_cfg.get("fontsize", 9))
+    label_fp = resolve_font_properties(config, "zh", fontsize)
     for line in ax.get_lines():
         label = line.get_label()
         key = next((k for k in _series_keys(config.get("data", {})) if series_cfg.get(k, {}).get("label", k) == label), None)
@@ -33,7 +35,7 @@ def _apply_data_labels(ax, config: Dict[str, Any], series_cfg: Dict[str, Any]) -
                 textcoords="offset points",
                 xytext=(dx * 10, dy * 10),
                 ha="center",
-                fontsize=fontsize,
+                fontproperties=label_fp,
             )
 
 
@@ -69,18 +71,23 @@ def draw_chart(config: Dict[str, Any]):
             label=s_cfg.get("label", key),
         )
 
+    title_fp = resolve_font_properties(config, "zh", int(font_cfg.get("title_size", 18)))
+    label_fp = resolve_font_properties(config, "zh", int(font_cfg.get("label_size", 13)))
+    tick_fp = resolve_font_properties(config, "zh", int(font_cfg.get("tick_size", 11)))
+
     title = chart_cfg.get("title", "")
     subtitle = chart_cfg.get("subtitle", "")
     if subtitle:
         title = f"{title}\n{subtitle}"
-    title_obj = ax.set_title(title, fontsize=int(font_cfg.get("title_size", 18)), pad=14)
+    title_obj = ax.set_title(title, fontproperties=title_fp, pad=14)
     title_xy = custom_cfg.get("title_xy")
     if isinstance(title_xy, list) and len(title_xy) >= 2:
         title_obj.set_position((float(title_xy[0]), float(title_xy[1])))
 
-    ax.set_xlabel(axes_cfg.get("x_label", ""), fontsize=int(font_cfg.get("label_size", 13)))
-    ax.set_ylabel(axes_cfg.get("y_label", ""), fontsize=int(font_cfg.get("label_size", 13)))
-    ax.tick_params(labelsize=int(font_cfg.get("tick_size", 11)))
+    ax.set_xlabel(axes_cfg.get("x_label", ""), fontproperties=label_fp)
+    ax.set_ylabel(axes_cfg.get("y_label", ""), fontproperties=label_fp)
+    for label in ax.get_xticklabels() + ax.get_yticklabels():
+        label.set_fontproperties(tick_fp)
 
     if axes_cfg.get("grid", True):
         ax.grid(True, alpha=float(axes_cfg.get("grid_alpha", 0.25)), linestyle="--")
@@ -96,9 +103,10 @@ def draw_chart(config: Dict[str, Any]):
             fontsize=int(legend_cfg.get("fontsize", font_cfg.get("legend_size", 11))),
             bbox_to_anchor=(float(leg_xy[0]), float(leg_xy[1])) if isinstance(leg_xy, list) else None,
         )
+        apply_legend_fonts(ax, config)
 
     _apply_data_labels(ax, config, series_cfg)
     apply_axis_limits(ax, axes_cfg)
     apply_layout(fig, config)
-    apply_annotations(fig, ax, config.get("annotations", []))
+    apply_annotations(fig, ax, config.get("annotations", []), config=config)
     return fig

@@ -22,7 +22,7 @@ FIELD_LABELS: Dict[str, str] = {
     "export.transparent": "透明背景",
     "chart.dpi": "导出 DPI",
     # 字体
-    "font.zh_name": "中文字体",
+    "font.zh_name": "中文字体（配置写入标准名，如 Microsoft YaHei）",
     "font.zh_path": "中文字体路径",
     "font.en_name": "英文字体",
     "font.en_path": "英文字体路径",

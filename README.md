@@ -2,6 +2,8 @@
 
 面向论文、报告作者的本地图表制图工具。选模板、导入数据、调整样式，实时预览后导出 PNG / SVG / PDF。
 
+当前协议版本：**schema v2**（`chartstudio_version 0.2.0`），支持布局边距、annotations 标注、字体注册表等能力。
+
 ## 安装与启动
 
 需要 Python 3.10 及以上。
@@ -12,6 +14,23 @@ streamlit run app.py
 ```
 
 浏览器会自动打开 ChartStudio 界面。若需导入 Excel，请确保依赖已安装（`requirements.txt` 已包含）。
+
+### 命令行（可选）
+
+不启动 Streamlit 时，可用 CLI 渲染、校验配置或导出复现脚本：
+
+```bash
+# 根据 chart_config.yaml 渲染图片
+python -m core.cli render path/to/chart_config.yaml --out output/chart.png
+
+# 校验配置（含字体、结构迁移提示）
+python -m core.cli check path/to/chart_config.yaml
+
+# 导出独立复现脚本
+python -m core.cli export-code path/to/chart_config.yaml --out reproduce.py --format png
+```
+
+`render` / `export-code` 支持 `--format png|svg|pdf`。
 
 ---
 
@@ -98,16 +117,76 @@ streamlit run app.py
 
 ## 字体与中文字符
 
-若中文显示为方框，请在左侧 **「字体设置」** 中选择中文字体（如微软雅黑、宋体、黑体）。Windows 用户可直接从系统字体列表选取。
+ChartStudio 使用**字体注册表**（`core/font_registry.py`）管理「界面显示名」与「可复现的真实字体信息」：
 
-英文、数字字体可分别设置，论文常用 Times New Roman 搭配中文宋体。
+- **界面下拉**显示友好名称，例如：微软雅黑、宋体、黑体、楷体、Times New Roman
+- **配置文件**保存 Matplotlib 可识别的 `family` 与字体文件 `path`，避免渲染层猜测中文别名
+
+在左侧 **「字体设置」** 中选择字体后，保存的配置大致如下（`normalize_config` 会自动补齐）：
+
+```yaml
+font:
+  zh:
+    display: "微软雅黑"          # 用户友好显示名
+    family: "Microsoft YaHei"  # Matplotlib family
+    path: "C:/Windows/Fonts/msyh.ttc"
+    source: "system"
+  en:
+    display: "Times New Roman"
+    family: "Times New Roman"
+    path: "C:/Windows/Fonts/times.ttf"
+    source: "system"
+  num:
+    display: "Times New Roman"
+    family: "Times New Roman"
+    path: "C:/Windows/Fonts/times.ttf"
+    source: "system"
+  # 兼容旧字段（仍保留，勿删）
+  zh_name: "Microsoft YaHei"
+  zh_path: "C:/Windows/Fonts/msyh.ttc"
+  en_name: "Times New Roman"
+  num_name: "Times New Roman"
+  title_size: 16
+  label_size: 12
+  tick_size: 10
+  legend_size: 10
+```
+
+英文、数字字体可分别设置；论文常用 **Times New Roman** 搭配 **宋体** 或 **微软雅黑**。
+
+高级选项中可手动指定 `font.file_path` 覆盖中文字体文件（例如项目 `fonts/` 目录下的自定义字体）。
+
+若中文显示为方框，请在「字体设置」中重新选择中文字体，并确认预览区「图表检查」中的字体诊断无 ⚠️。
+
+---
+
+## 配置协议（v2 概要）
+
+每个图表项目的核心是 `chart_config.yaml`，由 ChartStudio 与 AI 共同维护。v2 主要字段：
+
+| 字段 | 说明 |
+|------|------|
+| `schema_version` | 当前为 `2` |
+| `template_id` | 模板 ID，如 `line_chart_basic` |
+| `chartstudio_version` | ChartStudio 版本号 |
+| `data` | 图表数据 |
+| `figure` | 画布宽高（英寸） |
+| `export` | `dpi`、`transparent`、`bbox`（`fixed` / `tight`） |
+| `layout` | 边距 `left/right/bottom/top`、`use_tight_layout` |
+| `font` | 字体（见上文注册表结构） |
+| `axes` / `legend` / `series` | 坐标轴、图例、系列样式 |
+| `annotations` | 文本、箭头、矩形等叠加标注 |
+
+`annotations` 示例（text / arrow / rectangle）见 `examples/v2_annotations_acceptance/`。
+
+打开旧版配置时，`normalize_config` 会自动迁移字段（如 `chart.width` → `figure.width`、`chart.dpi` → `export.dpi`），并补齐 `layout`、`annotations`、`font.zh/en/num` 等结构。
 
 ---
 
 ## 常见问题
 
 **中文乱码或缺字？**  
-在「字体设置」里重新选择中文字体即可。
+在「字体设置」里重新选择中文字体；保存后检查 `font.zh.path` 是否指向有效字体文件。
 
 **Excel 上传失败？**  
 确认文件格式为 `.xlsx` 或 `.xls`，并重新执行 `pip install -r requirements.txt`。
@@ -127,7 +206,31 @@ streamlit run app.py
 
 新建项目后，你主要会用到：
 
-- **output** — 导出的图片（PNG / SVG / PDF）
-- **data** — 导入的数据文件备份
+| 路径 | 说明 |
+|------|------|
+| `chart_config.yaml` | 图表配置（数据 + 样式 + 协议字段） |
+| `chart_core.py` | 绘图逻辑（通常由模板复制，可按需修改） |
+| `output/` | 导出的图片（PNG / SVG / PDF） |
+| `data/` | 导入的数据文件备份 |
+| `fonts/` | 可选，放置自定义字体文件 |
+| `configs/` | 配置快照备份 |
 
-其余配置文件由 ChartStudio 自动维护，一般无需手动编辑。
+其余文件由 ChartStudio 自动维护。一般只需关心 `output` 与 `data`；进阶用户或 AI 协作时可编辑 `chart_config.yaml`。
+
+---
+
+## 开发者 / 架构说明
+
+逻辑集中在 `core/`，Streamlit 界面（`app.py`）只做编排。主要模块：
+
+| 模块 | 作用 |
+|------|------|
+| `core/render_service.py` | 统一渲染入口 |
+| `core/font_registry.py` | 字体注册表与 display/family/path 解析 |
+| `core/font_utils.py` | `FontProperties` 解析与字体诊断 |
+| `core/config_migrate.py` | 配置规范化与 v2 迁移 |
+| `core/layout.py` / `core/annotations.py` | 布局与标注 |
+| `core/cli.py` | 命令行渲染与校验 |
+| `templates/*/` | 各图表模板（`chart_config.yaml` + `chart_core.py`） |
+
+验收示例：`examples/v2_annotations_acceptance/`（含 `reproduce.py`）。

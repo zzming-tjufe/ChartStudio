@@ -229,23 +229,31 @@ def pick_font_file_dialog(source: str = "system") -> str | None:
 
 def _render_font_role_select(
     label: str,
-    name_key: str,
-    path_key: str,
+    role: str,
     font_cfg: Dict[str, Any],
-    catalog: Dict[str, str],
-    preferred: List[str],
     prefix: str,
 ) -> None:
-    from core.system_fonts import resolve_font_path_by_name, sort_font_names
+    from core.font_registry import (
+        registry_display_options,
+        resolve_font_option,
+        sync_font_role_to_legacy,
+    )
 
-    options = sort_font_names(catalog.keys(), preferred)
-    current_name = str(font_cfg.get(name_key, preferred[0] if preferred else ""))
+    options = registry_display_options(role)
+    block = font_cfg.get(role) if isinstance(font_cfg.get(role), dict) else {}
+    current_display = str(block.get("display", "") or "")
+    if not current_display:
+        from core.system_fonts import display_font_name, canonical_font_name
+
+        legacy = str(font_cfg.get(f"{role}_name", "") or "")
+        current_display = display_font_name(canonical_font_name(legacy)) if legacy else ""
+
     if not options:
-        options = list(preferred) if preferred else [current_name or "（未检测到系统字体）"]
-    if current_name and current_name not in options:
-        options = [current_name] + options
+        options = [current_display or "（未配置）"]
+    if current_display and current_display not in options:
+        options = [current_display] + options
 
-    widget_key = _widget_key(f"font.{name_key}", prefix)
+    widget_key = _widget_key(f"font.{role}", prefix)
     if widget_key in st.session_state and st.session_state[widget_key] not in options:
         st.session_state[widget_key] = options[0]
 
@@ -254,41 +262,38 @@ def _render_font_role_select(
         "options": options,
         "key": widget_key,
     }
-    if current_name in options:
-        select_kwargs["index"] = options.index(current_name)
+    if current_display in options:
+        select_kwargs["index"] = options.index(current_display)
 
-    selected = st.selectbox(**select_kwargs)
-    font_cfg[name_key] = selected
-    resolved = catalog.get(selected) or resolve_font_path_by_name(selected)
-    if resolved:
-        font_cfg[path_key] = resolved
-    path_text = str(font_cfg.get(path_key, "") or "")
-    if path_text:
-        st.caption(f"路径：`{path_text}`")
+    selected_display = st.selectbox(**select_kwargs)
+    resolved = resolve_font_option(selected_display, role, warn=False)
+    sync_font_role_to_legacy(font_cfg, role, resolved)
+
+    parts = []
+    if resolved.get("display"):
+        parts.append(f"显示：`{resolved['display']}`")
+    if resolved.get("family"):
+        parts.append(f"family：`{resolved['family']}`")
+    if resolved.get("path"):
+        parts.append(f"路径：`{resolved['path']}`")
+    if parts:
+        st.caption(" · ".join(parts))
 
 
 def render_font_settings(font_cfg: Dict[str, Any], prefix: str = "cfg") -> Dict[str, Any]:
-    """字体设置面板：系统字体下拉 + 高级手动路径。"""
+    """字体设置面板：注册表下拉（友好显示名）+ 写入 font.zh/en/num 对象。"""
     from copy import deepcopy
 
-    from core.system_fonts import (
-        PREFERRED_EN,
-        PREFERRED_NUM,
-        PREFERRED_ZH,
-        ensure_font_defaults,
-        get_font_catalog,
-    )
+    from core.font_utils import ensure_font_config_normalized
+    from core.system_fonts import ensure_font_defaults
 
     result = deepcopy(font_cfg)
     ensure_font_defaults(result)
-    catalog = get_font_catalog()
+    ensure_font_config_normalized({"font": result}, warn=False)
 
-    if not catalog:
-        st.info("未能读取系统字体列表，可在下方高级选项中手动填写字体路径。")
-
-    _render_font_role_select("中文字体", "zh_name", "zh_path", result, catalog, PREFERRED_ZH, prefix)
-    _render_font_role_select("英文字体", "en_name", "en_path", result, catalog, PREFERRED_EN, prefix)
-    _render_font_role_select("数字字体", "num_name", "num_path", result, catalog, PREFERRED_NUM, prefix)
+    _render_font_role_select("中文字体", "zh", result, prefix)
+    _render_font_role_select("英文字体", "en", result, prefix)
+    _render_font_role_select("数字字体", "num", result, prefix)
 
     for size_key in ("title_size", "label_size", "tick_size", "legend_size"):
         if size_key in result:
@@ -308,6 +313,15 @@ def render_font_settings(font_cfg: Dict[str, Any], prefix: str = "cfg") -> Dict[
             value=file_path_val,
             key=_widget_key("font.file_path", prefix),
         )
+        if result.get("file_path"):
+            from core.font_registry import resolve_font_option, sync_font_role_to_legacy
+
+            zh_override = resolve_font_option(
+                {"path": result["file_path"], "source": "project"},
+                "zh",
+                warn=False,
+            )
+            sync_font_role_to_legacy(result, "zh", zh_override)
         if st.button(
             "从项目 fonts/ 选择文件",
             key=_widget_key("font.file_path_browse", prefix),
@@ -318,13 +332,17 @@ def render_font_settings(font_cfg: Dict[str, Any], prefix: str = "cfg") -> Dict[
                 st.session_state[sync_key] = _normalize_picked_font_path(picked)
                 st.rerun()
 
-        st.caption("当前生效路径（只读，由下拉框自动解析）")
-        for path_key, path_label in (
-            ("zh_path", "中文字体"),
-            ("en_path", "英文字体"),
-            ("num_path", "数字字体"),
+        st.caption("当前生效配置（只读）")
+        for role_key, path_label in (
+            ("zh", "中文"),
+            ("en", "英文"),
+            ("num", "数字"),
         ):
-            st.text(f"{path_label}：{result.get(path_key, '') or '—'}")
+            block = result.get(role_key) if isinstance(result.get(role_key), dict) else {}
+            st.text(
+                f"{path_label}：{block.get('display', '—')} / {block.get('family', '—')} "
+                f"→ {block.get('path', '—')}"
+            )
 
     return result
 

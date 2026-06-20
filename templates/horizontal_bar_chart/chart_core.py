@@ -11,6 +11,7 @@ from core.annotations import apply_annotations
 from core.axis_limits import apply_axis_limits
 from core.bar_colors import bar_colors_for_categories
 from core.data_label_format import format_data_label
+from core.font_utils import apply_legend_fonts, resolve_font_properties
 from core.layout import apply_layout
 
 
@@ -47,11 +48,18 @@ def draw_chart(config: Dict[str, Any]):
         linewidth=float(bar_cfg.get("edge_width", 0.8)),
         alpha=float(bar_cfg.get("alpha", 0.88)),
     )
+    title_fp = resolve_font_properties(config, "zh", int(font_cfg.get("title_size", 16)))
+    label_fp = resolve_font_properties(config, "zh", int(font_cfg.get("label_size", 12)))
+    tick_fp = resolve_font_properties(config, "zh", int(font_cfg.get("tick_size", 10)))
+    data_label_fp = resolve_font_properties(config, "zh", int(label_cfg.get("fontsize", 9)))
+
     ax.set_yticks(list(y_pos))
-    ax.set_yticklabels(categories, fontsize=int(font_cfg.get("tick_size", 10)))
-    ax.set_title(chart_cfg.get("title", ""), fontsize=int(font_cfg.get("title_size", 16)))
-    ax.set_xlabel(axes_cfg.get("x_label", ""), fontsize=int(font_cfg.get("label_size", 12)))
-    ax.set_ylabel(axes_cfg.get("y_label", ""), fontsize=int(font_cfg.get("label_size", 12)))
+    ax.set_yticklabels(categories, fontproperties=tick_fp)
+    ax.set_title(chart_cfg.get("title", ""), fontproperties=title_fp)
+    ax.set_xlabel(axes_cfg.get("x_label", ""), fontproperties=label_fp)
+    ax.set_ylabel(axes_cfg.get("y_label", ""), fontproperties=label_fp)
+    for label in ax.get_xticklabels():
+        label.set_fontproperties(tick_fp)
 
     if axes_cfg.get("grid", True):
         ax.grid(axis="x", alpha=float(axes_cfg.get("grid_alpha", 0.2)))
@@ -63,10 +71,10 @@ def draw_chart(config: Dict[str, Any]):
                 i,
                 format_data_label(v, label_cfg),
                 va="center",
-                fontsize=int(label_cfg.get("fontsize", 9)),
+                fontproperties=data_label_fp,
             )
 
     apply_axis_limits(ax, axes_cfg)
     apply_layout(fig, config)
-    apply_annotations(fig, ax, config.get("annotations", []))
+    apply_annotations(fig, ax, config.get("annotations", []), config=config)
     return fig

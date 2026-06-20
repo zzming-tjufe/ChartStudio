@@ -414,7 +414,7 @@ def _render_chart(config: dict):
             st.session_state.last_render_fingerprint = fingerprint
             st.session_state.last_render_succeeded = False
             return None
-        apply_chart_fonts(fig, font_bundle, render_cfg.get("font", {}))
+        apply_chart_fonts(fig, render_cfg)
         st.session_state.render_error = None
         st.session_state.render_trace = None
         st.session_state.render_status = "success"

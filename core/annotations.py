@@ -5,6 +5,8 @@ from __future__ import annotations
 import warnings
 from typing import Any, Dict, List, Optional, Tuple
 
+from core.font_utils import annotation_text_fontproperties
+
 VALID_COORDS = frozenset({"figure", "axes", "data"})
 VALID_TYPES = frozenset({"text", "arrow", "rectangle"})
 
@@ -72,7 +74,7 @@ def _parse_style_dict(value: Any) -> Dict[str, Any]:
     return value if isinstance(value, dict) else {}
 
 
-def _apply_text(fig, ax, item: dict) -> None:
+def _apply_text(fig, ax, item: dict, config: Optional[Dict[str, Any]]) -> None:
     ann_id = str(item.get("id", "") or "")
     text = item.get("text")
     if text is None or str(text) == "":
@@ -88,20 +90,21 @@ def _apply_text(fig, ax, item: dict) -> None:
         return
     coord, x, y = pos
     style = _parse_style_dict(item.get("style"))
+    fp = annotation_text_fontproperties(config, style, default_size=int(style.get("font_size", 10)))
 
     ax.text(
         x,
         y,
         str(text),
         transform=_resolve_transform(fig, ax, coord),
-        fontsize=int(style.get("font_size", 10)),
+        fontproperties=fp,
         color=str(style.get("color", "#333333")),
         ha=str(style.get("ha", "center")),
         va=str(style.get("va", "center")),
     )
 
 
-def _apply_arrow(fig, ax, item: dict) -> None:
+def _apply_arrow(fig, ax, item: dict, config: Optional[Dict[str, Any]]) -> None:
     ann_id = str(item.get("id", "") or "")
     start = _parse_coord_point(item.get("start"), annotation_id=ann_id, field="start")
     end = _parse_coord_point(item.get("end"), annotation_id=ann_id, field="end")
@@ -111,22 +114,28 @@ def _apply_arrow(fig, ax, item: dict) -> None:
     start_coord, sx, sy = start
     end_coord, ex, ey = end
     style = _parse_style_dict(item.get("style"))
+    label = str(item.get("text", "") or "")
 
-    ax.annotate(
-        str(item.get("text", "") or ""),
-        xy=(ex, ey),
-        xytext=(sx, sy),
-        xycoords=_coord_name(end_coord),
-        textcoords=_coord_name(start_coord),
-        arrowprops={
+    kwargs: Dict[str, Any] = {
+        "xy": (ex, ey),
+        "xytext": (sx, sy),
+        "xycoords": _coord_name(end_coord),
+        "textcoords": _coord_name(start_coord),
+        "arrowprops": {
             "arrowstyle": str(style.get("arrowstyle", "->")),
             "color": str(style.get("color", "#333333")),
             "lw": float(style.get("line_width", 1.5)),
         },
-    )
+    }
+    if label:
+        fp = annotation_text_fontproperties(config, style, default_size=int(style.get("font_size", 10)))
+        if fp is not None:
+            kwargs["fontproperties"] = fp
+
+    ax.annotate(label, **kwargs)
 
 
-def _apply_rectangle(fig, ax, item: dict) -> None:
+def _apply_rectangle(fig, ax, item: dict, config: Optional[Dict[str, Any]]) -> None:
     from matplotlib.patches import Rectangle
 
     ann_id = str(item.get("id", "") or "")
@@ -164,7 +173,12 @@ def _apply_rectangle(fig, ax, item: dict) -> None:
     ax.add_patch(rect)
 
 
-def apply_annotations(fig, ax, annotations: list[dict]) -> None:
+def apply_annotations(
+    fig,
+    ax,
+    annotations: list[dict],
+    config: Optional[Dict[str, Any]] = None,
+) -> None:
     """在布局确定后叠加 annotations；单条失败不中断整图。"""
     if not annotations:
         return
@@ -182,10 +196,10 @@ def apply_annotations(fig, ax, annotations: list[dict]) -> None:
             continue
         try:
             if ann_type == "text":
-                _apply_text(fig, ax, item)
+                _apply_text(fig, ax, item, config)
             elif ann_type == "arrow":
-                _apply_arrow(fig, ax, item)
+                _apply_arrow(fig, ax, item, config)
             elif ann_type == "rectangle":
-                _apply_rectangle(fig, ax, item)
+                _apply_rectangle(fig, ax, item, config)
         except Exception as exc:
             _warn(str(item.get("id", "") or ""), f"渲染异常：{type(exc).__name__} — {exc}")

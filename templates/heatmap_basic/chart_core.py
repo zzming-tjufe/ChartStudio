@@ -10,6 +10,7 @@ import numpy as np
 from core.annotations import apply_annotations
 from core.axis_limits import apply_axis_limits
 from core.data_label_format import format_data_label
+from core.font_utils import resolve_font_properties
 from core.layout import apply_layout
 
 
@@ -38,16 +39,22 @@ def draw_chart(config: Dict[str, Any]):
 
     if x_labels:
         ax.set_xticks(range(len(x_labels)))
-        ax.set_xticklabels(x_labels, fontsize=int(font_cfg.get("tick_size", 9)), rotation=45, ha="right")
+        tick_fp_early = resolve_font_properties(config, "zh", int(font_cfg.get("tick_size", 9)))
+        ax.set_xticklabels(x_labels, fontproperties=tick_fp_early, rotation=45, ha="right")
     if y_labels:
         ax.set_yticks(range(len(y_labels)))
-        ax.set_yticklabels(y_labels, fontsize=int(font_cfg.get("tick_size", 9)))
+        tick_fp_early = resolve_font_properties(config, "zh", int(font_cfg.get("tick_size", 9)))
+        ax.set_yticklabels(y_labels, fontproperties=tick_fp_early)
 
     if linewidth > 0:
         ax.set_xticks(np.arange(-0.5, ncols, 1), minor=True)
         ax.set_yticks(np.arange(-0.5, nrows, 1), minor=True)
         ax.grid(which="minor", color="white", linestyle="-", linewidth=linewidth)
         ax.tick_params(which="minor", bottom=False, left=False)
+
+    title_fp = resolve_font_properties(config, "zh", int(font_cfg.get("title_size", 16)))
+    label_fp = resolve_font_properties(config, "zh", int(font_cfg.get("label_size", 12)))
+    tick_fp = resolve_font_properties(config, "zh", int(font_cfg.get("tick_size", 9)))
 
     if heat_cfg.get("annot", True):
         for i in range(nrows):
@@ -59,15 +66,17 @@ def draw_chart(config: Dict[str, Any]):
                     ha="center",
                     va="center",
                     color="black",
-                    fontsize=int(font_cfg.get("tick_size", 9)),
+                    fontproperties=tick_fp,
                 )
 
     title = chart_cfg.get("title", "")
     if chart_cfg.get("subtitle"):
         title = f"{title}\n{chart_cfg.get('subtitle')}"
-    ax.set_title(title, fontsize=int(font_cfg.get("title_size", 16)))
-    ax.set_xlabel(axes_cfg.get("x_label", ""), fontsize=int(font_cfg.get("label_size", 12)))
-    ax.set_ylabel(axes_cfg.get("y_label", ""), fontsize=int(font_cfg.get("label_size", 12)))
+    ax.set_title(title, fontproperties=title_fp)
+    ax.set_xlabel(axes_cfg.get("x_label", ""), fontproperties=label_fp)
+    ax.set_ylabel(axes_cfg.get("y_label", ""), fontproperties=label_fp)
+    for label in ax.get_xticklabels() + ax.get_yticklabels():
+        label.set_fontproperties(tick_fp)
 
     if axes_cfg.get("grid", False):
         ax.grid(which="major", alpha=float(axes_cfg.get("grid_alpha", 0.3)))
@@ -77,5 +86,5 @@ def draw_chart(config: Dict[str, Any]):
 
     apply_axis_limits(ax, axes_cfg)
     apply_layout(fig, config)
-    apply_annotations(fig, ax, config.get("annotations", []))
+    apply_annotations(fig, ax, config.get("annotations", []), config=config)
     return fig

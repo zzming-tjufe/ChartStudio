@@ -1,4 +1,4 @@
-# 基础折线图配置
+# v2 协议验收示例 — text / arrow / rectangle annotations
 schema_version: 2
 template_id: line_chart_basic
 chartstudio_version: "0.2.0"
@@ -10,11 +10,53 @@ layout:
   top: 0.88
   use_tight_layout: false
 
-annotations: []
+annotations:
+  - id: label_peak
+    type: text
+    text: "实验组峰值"
+    position:
+      coord: axes
+      x: 0.68
+      y: 0.88
+    style:
+      font_size: 11
+      color: "#333333"
+      ha: left
+      va: bottom
+
+  - id: arrow_to_peak
+    type: arrow
+    start:
+      coord: axes
+      x: 0.66
+      y: 0.84
+    end:
+      coord: data
+      x: 4
+      y: 5.0
+    style:
+      color: "#E53935"
+      line_width: 1.8
+      arrowstyle: "->"
+
+  - id: highlight_region
+    type: rectangle
+    position:
+      coord: axes
+      x: 0.52
+      y: 0.12
+    size:
+      width: 0.38
+      height: 0.78
+    style:
+      fill: false
+      edge_color: "#1565C0"
+      line_width: 1.2
+      alpha: 0.85
 
 chart:
-  title: "基础折线图"
-  subtitle: ""
+  title: "v2 Annotations 验收示例"
+  subtitle: "text + 混合坐标 arrow + fill:false rectangle"
 
 figure:
   width: 10.0
@@ -40,7 +82,7 @@ font:
   legend_size: 10
 
 axes:
-  x_label: "月份"
+  x_label: "月份（数值 X）"
   y_label: "数值"
   grid: true
   grid_alpha: 0.3
@@ -48,7 +90,7 @@ axes:
 
 legend:
   show: true
-  loc: "best"
+  loc: "upper left"
   frameon: true
   fontsize: 10
 

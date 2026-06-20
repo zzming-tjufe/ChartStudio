@@ -115,6 +115,11 @@ def normalize_config(
         from core.system_fonts import ensure_font_defaults
 
         ensure_font_defaults(font)
+        from core.font_utils import ensure_font_config_normalized
+
+        role_notes = ensure_font_config_normalized(cfg, warn=False)
+        if role_notes:
+            notes.extend(role_notes)
         if had_legacy:
             notes.append("已为 font 配置补充中/英/数字字体名称与路径字段")
 

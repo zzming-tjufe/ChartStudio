@@ -25,7 +25,7 @@ export:
   bbox: fixed
 
 font:
-  zh_name: "微软雅黑"
+  zh_name: "Microsoft YaHei"
   zh_path: ""
   en_name: "Times New Roman"
   en_path: ""

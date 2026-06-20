@@ -98,7 +98,7 @@ def render_chart_from_config(
     font_bundle = prepare_chart_fonts(normalized)
     fig = draw_fn(normalized)
     if fig is not None:
-        apply_chart_fonts(fig, font_bundle, normalized.get("font", {}))
+        apply_chart_fonts(fig, normalized)
     return fig
 
 

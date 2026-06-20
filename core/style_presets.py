@@ -37,7 +37,7 @@ PRESET_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "figure": {"width": 8.0, "height": 5.0},
         "export": {"dpi": 300, "transparent": False},
         "font": {
-            "zh_name": "宋体",
+            "zh_name": "SimSun",
             "en_name": "Times New Roman",
             "num_name": "Times New Roman",
             "title_size": 14,
@@ -57,7 +57,7 @@ PRESET_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "figure": {"width": 10.0, "height": 6.0},
         "export": {"dpi": 200, "transparent": False},
         "font": {
-            "zh_name": "微软雅黑",
+            "zh_name": "Microsoft YaHei",
             "en_name": "Arial",
             "num_name": "Arial",
             "title_size": 20,
@@ -77,7 +77,7 @@ PRESET_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "figure": {"width": 11.0, "height": 6.0},
         "export": {"dpi": 200, "transparent": False},
         "font": {
-            "zh_name": "微软雅黑",
+            "zh_name": "Microsoft YaHei",
             "en_name": "Arial",
             "num_name": "Arial",
             "title_size": 16,
@@ -97,7 +97,7 @@ PRESET_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "figure": {"width": 8.5, "height": 5.5},
         "export": {"dpi": 300, "transparent": False},
         "font": {
-            "zh_name": "黑体",
+            "zh_name": "SimHei",
             "en_name": "Times New Roman",
             "num_name": "Times New Roman",
             "title_size": 14,
@@ -117,7 +117,7 @@ PRESET_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "export": {"dpi": 150, "transparent": True},
         "figure": {"width": 12.0, "height": 6.5},
         "font": {
-            "zh_name": "微软雅黑",
+            "zh_name": "Microsoft YaHei",
             "en_name": "Arial",
             "num_name": "Arial",
             "title_size": 24,

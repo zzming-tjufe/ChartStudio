@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 
 from core.annotations import apply_annotations
 from core.axis_limits import apply_axis_limits
+from core.font_utils import apply_legend_fonts, resolve_font_properties
 from core.layout import apply_layout
 
 
@@ -46,17 +47,22 @@ def draw_chart(config: Dict[str, Any]):
             label=s_cfg.get("label", key),
         )
 
+    title_fp = resolve_font_properties(config, "zh", int(font_cfg.get("title_size", 16)))
+    label_fp = resolve_font_properties(config, "zh", int(font_cfg.get("label_size", 12)))
+    tick_fp = resolve_font_properties(config, "zh", int(font_cfg.get("tick_size", 10)))
+
     title = chart_cfg.get("title", "")
     if chart_cfg.get("subtitle"):
         title = f"{title}\n{chart_cfg.get('subtitle')}"
-    title_obj = ax.set_title(title, fontsize=int(font_cfg.get("title_size", 16)))
+    title_obj = ax.set_title(title, fontproperties=title_fp)
     title_xy = custom_cfg.get("title_xy")
     if isinstance(title_xy, list) and len(title_xy) >= 2:
         title_obj.set_position((float(title_xy[0]), float(title_xy[1])))
 
-    ax.set_xlabel(axes_cfg.get("x_label", ""), fontsize=int(font_cfg.get("label_size", 12)))
-    ax.set_ylabel(axes_cfg.get("y_label", ""), fontsize=int(font_cfg.get("label_size", 12)))
-    ax.tick_params(labelsize=int(font_cfg.get("tick_size", 10)))
+    ax.set_xlabel(axes_cfg.get("x_label", ""), fontproperties=label_fp)
+    ax.set_ylabel(axes_cfg.get("y_label", ""), fontproperties=label_fp)
+    for label in ax.get_xticklabels() + ax.get_yticklabels():
+        label.set_fontproperties(tick_fp)
 
     if axes_cfg.get("grid", True):
         ax.grid(True, alpha=float(axes_cfg.get("grid_alpha", 0.25)))
@@ -74,8 +80,9 @@ def draw_chart(config: Dict[str, Any]):
         if isinstance(leg_xy, list) and len(leg_xy) >= 2:
             legend_kwargs["bbox_to_anchor"] = (float(leg_xy[0]), float(leg_xy[1]))
         ax.legend(**legend_kwargs)
+        apply_legend_fonts(ax, config)
 
     apply_axis_limits(ax, axes_cfg)
     apply_layout(fig, config)
-    apply_annotations(fig, ax, config.get("annotations", []))
+    apply_annotations(fig, ax, config.get("annotations", []), config=config)
     return fig

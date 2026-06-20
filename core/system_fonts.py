@@ -46,12 +46,26 @@ SUBSTRING_ALIAS_RULES: List[tuple[str, str]] = [
 
 LOOKUP_HINTS: Dict[str, List[str]] = {
     "微软雅黑": ["microsoft yahei", "msyh"],
+    "Microsoft YaHei": ["microsoft yahei", "msyh"],
     "黑体": ["simhei"],
+    "SimHei": ["simhei"],
     "宋体": ["simsun", "nsimsun"],
+    "SimSun": ["simsun", "nsimsun"],
     "楷体": ["kaiti", "simkai"],
+    "KaiTi": ["kaiti", "simkai"],
     "Times New Roman": ["times new roman", "times.ttf"],
     "Arial": ["arial"],
     "Calibri": ["calibri"],
+}
+
+# 下拉中文显示名 → Matplotlib / 注册表标准名（写入 chart_config.yaml）
+DISPLAY_TO_CANONICAL: Dict[str, str] = {
+    "微软雅黑": "Microsoft YaHei",
+    "黑体": "SimHei",
+    "宋体": "SimSun",
+    "新宋体": "NSimSun",
+    "楷体": "KaiTi",
+    "仿宋": "FangSong",
 }
 
 
@@ -166,6 +180,51 @@ def get_font_catalog() -> Dict[str, str]:
     return {name: str(path) for name, path in sorted(catalog_paths.items(), key=lambda x: x[0].lower())}
 
 
+def canonical_font_name(name: str) -> str:
+    """将任意字体名（中文显示名或别名）规范为注册表标准名。"""
+    raw = str(name).strip()
+    if not raw:
+        return raw
+    if raw in DISPLAY_TO_CANONICAL:
+        return DISPLAY_TO_CANONICAL[raw]
+    if raw in DISPLAY_ALIASES:
+        return raw
+    lowered = raw.lower()
+    for registry in DISPLAY_ALIASES:
+        if registry.lower() == lowered:
+            return registry
+    return raw
+
+
+def display_font_name(name: str) -> str:
+    """将标准名映射为下拉框用的友好显示名（中文优先）。"""
+    raw = str(name).strip()
+    if not raw:
+        return raw
+    if raw in DISPLAY_ALIASES:
+        return DISPLAY_ALIASES[raw]
+    if raw in DISPLAY_TO_CANONICAL:
+        return raw
+    for display, canonical in DISPLAY_TO_CANONICAL.items():
+        if canonical == raw:
+            return display
+    return raw
+
+
+def normalize_font_role_names(font_cfg: Dict[str, object]) -> List[str]:
+    """将 font.*_name 规范为标准字体名（原地修改）。"""
+    notes: List[str] = []
+    for key in ("zh_name", "en_name", "num_name"):
+        raw = str(font_cfg.get(key, "") or "").strip()
+        if not raw:
+            continue
+        canonical = canonical_font_name(raw)
+        if canonical != raw:
+            notes.append(f"font.{key} 已从「{raw}」规范为「{canonical}」")
+        font_cfg[key] = canonical
+    return notes
+
+
 def sort_font_names(names: Iterable[str], preferred: List[str]) -> List[str]:
     name_set = set(names)
     head = [n for n in preferred if n in name_set]
@@ -207,8 +266,9 @@ def resolve_font_with_priority(name: str, priority: List[str]) -> Optional[str]:
 
 def ensure_font_defaults(font_cfg: Dict[str, object]) -> None:
     """为缺失字段填充默认名称与可解析路径（原地修改）。"""
+    normalize_font_role_names(font_cfg)
     defaults = {
-        "zh_name": ("微软雅黑", PREFERRED_ZH),
+        "zh_name": ("Microsoft YaHei", PREFERRED_ZH),
         "en_name": ("Times New Roman", PREFERRED_EN),
         "num_name": ("Times New Roman", PREFERRED_NUM),
     }

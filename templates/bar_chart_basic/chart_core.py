@@ -11,6 +11,7 @@ from core.annotations import apply_annotations
 from core.axis_limits import apply_axis_limits
 from core.bar_colors import bar_colors_for_categories
 from core.data_label_format import format_data_label
+from core.font_utils import apply_legend_fonts, resolve_font_properties
 from core.layout import apply_layout
 from core.data_keys import category_series_key
 
@@ -50,14 +51,21 @@ def draw_chart(config: Dict[str, Any]):
         linewidth=float(bar_cfg.get("edge_width", 1.0)),
         alpha=float(bar_cfg.get("alpha", 0.9)),
     )
+    title_fp = resolve_font_properties(config, "zh", int(font_cfg.get("title_size", 16)))
+    label_fp = resolve_font_properties(config, "zh", int(font_cfg.get("label_size", 12)))
+    tick_fp = resolve_font_properties(config, "zh", int(font_cfg.get("tick_size", 10)))
+    data_label_fp = resolve_font_properties(config, "zh", int(label_cfg.get("fontsize", 10)))
+
     ax.set_xticks(list(x_pos))
-    ax.set_xticklabels(categories, fontsize=int(font_cfg.get("tick_size", 10)))
+    ax.set_xticklabels(categories, fontproperties=tick_fp)
     title = chart_cfg.get("title", "")
     if chart_cfg.get("subtitle"):
         title = f"{title}\n{chart_cfg.get('subtitle')}"
-    ax.set_title(title, fontsize=int(font_cfg.get("title_size", 16)))
-    ax.set_xlabel(axes_cfg.get("x_label", ""), fontsize=int(font_cfg.get("label_size", 12)))
-    ax.set_ylabel(axes_cfg.get("y_label", ""), fontsize=int(font_cfg.get("label_size", 12)))
+    ax.set_title(title, fontproperties=title_fp)
+    ax.set_xlabel(axes_cfg.get("x_label", ""), fontproperties=label_fp)
+    ax.set_ylabel(axes_cfg.get("y_label", ""), fontproperties=label_fp)
+    for label in ax.get_yticklabels():
+        label.set_fontproperties(tick_fp)
 
     if axes_cfg.get("grid", True):
         ax.grid(axis="y", alpha=float(axes_cfg.get("grid_alpha", 0.2)))
@@ -74,6 +82,7 @@ def draw_chart(config: Dict[str, Any]):
             labels.append(entry.get("label", str(cat)) if isinstance(entry, dict) else str(cat))
             handles.append(plt.Rectangle((0, 0), 1, 1, fc=colors[i]))
         ax.legend(handles, labels, loc=legend_cfg.get("loc", "best"), frameon=legend_cfg.get("frameon", False))
+        apply_legend_fonts(ax, config)
 
     if label_cfg.get("show", False):
         for i, v in enumerate(values):
@@ -83,10 +92,10 @@ def draw_chart(config: Dict[str, Any]):
                 format_data_label(v, label_cfg),
                 ha="center",
                 va="bottom",
-                fontsize=int(label_cfg.get("fontsize", 10)),
+                fontproperties=data_label_fp,
             )
 
     apply_axis_limits(ax, axes_cfg)
     apply_layout(fig, config)
-    apply_annotations(fig, ax, config.get("annotations", []))
+    apply_annotations(fig, ax, config.get("annotations", []), config=config)
     return fig
