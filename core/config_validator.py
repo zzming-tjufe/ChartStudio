@@ -121,9 +121,7 @@ def _check_protocol_v2(config: dict) -> List[ValidationIssue]:
     annotations = config.get("annotations")
     if annotations is not None and not isinstance(annotations, list):
         issues.append(ValidationIssue("error", "annotations", "必须是列表"))
-        return issues
-
-    if isinstance(annotations, list):
+    elif isinstance(annotations, list):
         seen_ids: set[str] = set()
         for idx, item in enumerate(annotations):
             prefix = f"annotations[{idx}]"
