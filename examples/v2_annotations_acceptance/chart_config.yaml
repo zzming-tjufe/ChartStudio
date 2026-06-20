@@ -1,125 +1,155 @@
-# v2 协议验收示例 — text / arrow / rectangle annotations
 schema_version: 2
 template_id: line_chart_basic
-chartstudio_version: "0.2.0"
-
+chartstudio_version: 0.2.0
 layout:
   left: 0.12
   right: 0.95
   bottom: 0.16
   top: 0.88
   use_tight_layout: false
-
 annotations:
-  - id: label_peak
-    type: text
-    text: "实验组峰值"
-    position:
-      coord: axes
-      x: 0.68
-      y: 0.88
-    style:
-      font_size: 11
-      color: "#333333"
-      ha: left
-      va: bottom
-
-  - id: arrow_to_peak
-    type: arrow
-    start:
-      coord: axes
-      x: 0.66
-      y: 0.84
-    end:
-      coord: data
-      x: 4
-      y: 5.0
-    style:
-      color: "#E53935"
-      line_width: 1.8
-      arrowstyle: "->"
-
-  - id: highlight_region
-    type: rectangle
-    position:
-      coord: axes
-      x: 0.52
-      y: 0.12
-    size:
-      width: 0.38
-      height: 0.78
-    style:
-      fill: false
-      edge_color: "#1565C0"
-      line_width: 1.2
-      alpha: 0.85
-
+- id: label_peak
+  type: text
+  text: 实验组峰值
+  position:
+    coord: axes
+    x: 0.68
+    y: 0.88
+  style:
+    font_size: 11
+    color: '#333333'
+    ha: left
+    va: bottom
+- id: arrow_to_peak
+  type: arrow
+  start:
+    coord: axes
+    x: 0.66
+    y: 0.84
+  end:
+    coord: data
+    x: 4
+    y: 5.0
+  style:
+    color: '#E53935'
+    line_width: 1.8
+    arrowstyle: ->
+- id: highlight_region
+  type: rectangle
+  position:
+    coord: axes
+    x: 0.52
+    y: 0.12
+  size:
+    width: 0.38
+    height: 0.78
+  style:
+    fill: false
+    edge_color: '#1565C0'
+    line_width: 1.2
+    alpha: 0.85
 chart:
-  title: "v2 Annotations 验收示例"
-  subtitle: "text + 混合坐标 arrow + fill:false rectangle"
-
+  title: v2 Annotations 验收示例
+  subtitle: text + 混合坐标 arrow + fill:false rectangle
 figure:
   width: 10.0
   height: 6.0
-
 export:
   dpi: 150
   transparent: false
   bbox: fixed
-
 font:
-  zh_name: "Microsoft YaHei"
-  zh_path: ""
-  en_name: "Times New Roman"
-  en_path: ""
-  num_name: "Times New Roman"
-  num_path: ""
-  family: "sans-serif"
-  file_path: ""
+  zh_name: Microsoft YaHei
+  zh_path: C:\Windows\Fonts\msyh.ttc
+  en_name: Times New Roman
+  en_path: C:\Windows\Fonts\times.ttf
+  num_name: Times New Roman
+  num_path: C:\Windows\Fonts\times.ttf
+  family: sans-serif
+  file_path: ''
   title_size: 16
   label_size: 12
   tick_size: 10
   legend_size: 10
-
+  zh:
+    display: 微软雅黑
+    family: Microsoft YaHei
+    path: C:\Windows\Fonts\msyh.ttc
+    source: system
+    status: ok
+    registry_id: microsoft_yahei
+  en:
+    display: Times New Roman
+    family: Times New Roman
+    path: C:\Windows\Fonts\times.ttf
+    source: system
+    status: ok
+    registry_id: times_new_roman
+  num:
+    display: Times New Roman
+    family: Times New Roman
+    path: C:\Windows\Fonts\times.ttf
+    source: system
+    status: ok
+    registry_id: times_new_roman
 axes:
-  x_label: "月份（数值 X）"
-  y_label: "数值"
+  x_label: 月份（数值 X）
+  y_label: 数值
   grid: true
   grid_alpha: 0.3
   spine_visible: true
-
+  xlim: null
+  ylim: null
+  y_margin: 0.05
 legend:
   show: true
-  loc: "upper left"
+  loc: upper left
   frameon: true
   fontsize: 10
-
 line_style:
   width: 2.0
   marker_size: 6.0
-  marker: "o"
+  marker: o
   marker_edge_width: 1.0
   alpha: 1.0
-
 series:
   overall:
-    color: "#1565C0"
+    color: '#1565C0'
   series_a:
-    color: "#E53935"
-    label: "实验组"
+    color: '#E53935'
+    label: 实验组
   series_b:
-    color: "#43A047"
-    label: "对照组"
-
+    color: '#43A047'
+    label: 对照组
 custom_text:
-  title_xy: [0.5, 1.02]
-  legend_xy: [1.0, 1.0]
-
+  title_xy:
+  - 0.5
+  - 1.02
+  legend_xy:
+  - 1.0
+  - 1.0
 data_labels:
   show: false
   fontsize: 9
-
+  decimals: 1
+  prefix: ''
+  suffix: ''
 data:
-  x: [1, 2, 3, 4, 5]
-  series_a: [2.0, 4.0, 3.0, 5.0, 4.0]
-  series_b: [1.0, 3.0, 2.0, 4.0, 3.0]
+  x:
+  - 1
+  - 2
+  - 3
+  - 4
+  - 5
+  series_a:
+  - 2.0
+  - 4.0
+  - 3.0
+  - 5.0
+  - 4.0
+  series_b:
+  - 1.0
+  - 3.0
+  - 2.0
+  - 4.0
+  - 3.0

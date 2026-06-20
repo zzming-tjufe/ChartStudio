@@ -4,37 +4,115 @@
 
 当前协议版本：**schema v2**（`chartstudio_version 0.2.0`），支持布局边距、annotations 标注、字体注册表等能力。
 
+**三种入口并存（迁移期）：**
+
+| 入口 | 用途 |
+|------|------|
+| `streamlit run app.py` | **主应用**：建项目、导数据、调样式、导出 |
+| `chartstudio` / `cs` | **CLI**：渲染、校验、导出复现脚本 |
+| `frontend/` + `core/api_server.py` | **React 原型**：可视化拖动 annotation，写回 YAML 后 Matplotlib 重渲染 |
+
+Streamlit 仍是日常使用入口；CLI 适合脚本与 CI；React 仅验证「前端编辑 annotations ↔ 配置协议 ↔ 后端渲染」闭环。
+
 ## 安装与启动
 
 需要 Python 3.10 及以上。
 
 ```bash
 pip install -r requirements.txt
+pip install -e .          # 推荐：注册 chartstudio / cs 命令（见 pyproject.toml）
 streamlit run app.py
 ```
 
 浏览器会自动打开 ChartStudio 界面。若需导入 Excel，请确保依赖已安装（`requirements.txt` 已包含）。
 
-### 命令行（可选）
+### 三种入口一览
 
-不启动 Streamlit 时，可用 CLI 渲染、校验配置或导出复现脚本：
-
-```bash
-# 根据 chart_config.yaml 渲染图片
-python -m core.cli render path/to/chart_config.yaml --out output/chart.png
-
-# 校验配置（含字体、结构迁移提示）
-python -m core.cli check path/to/chart_config.yaml
-
-# 导出独立复现脚本
-python -m core.cli export-code path/to/chart_config.yaml --out reproduce.py --format png
-```
-
-`render` / `export-code` 支持 `--format png|svg|pdf`。
+| 入口 | 命令 | 适合 |
+|------|------|------|
+| **Streamlit（主应用）** | `streamlit run app.py` | 建项目、导数据、调样式、导出 |
+| **CLI** | `chartstudio .` / `cs check .` | 脚本化渲染、CI 校验、无界面批处理 |
+| **React 原型** | `uvicorn core.api_server:app` + `frontend` dev | 拖动编辑 annotations，验证协议闭环 |
 
 ---
 
-## 怎么用
+### 命令行（CLI）
+
+在仓库根目录执行 `pip install -e .` 后，使用 **`chartstudio`** 或短别名 **`cs`**。未安装时等价于 `python -m core.cli`。
+
+**路径规则**：`config` 参数可以是**项目目录**（自动找 `chart_config.yaml`）或 **yaml 文件路径**；省略时默认为当前目录 `.`。
+
+| 子命令 | 别名 | 作用 |
+|--------|------|------|
+| `render` | （省略子命令时默认） | 渲染到图片 |
+| `check` | `validate` | 校验配置 + 可选渲染探测 |
+| `script` | `export-code` | 生成 `reproduce.py` 复现脚本 |
+
+**常用示例：**
+
+```bash
+# 最简：渲染当前目录 → output/chart.png
+chartstudio .
+cs .
+
+# 指定项目 / 配置文件
+chartstudio render examples/v2_annotations_acceptance
+chartstudio render path/to/chart_config.yaml
+
+# 格式与输出（-o 可省略）
+chartstudio render . -f svg                    # → output/{标题或 chart}.svg
+chartstudio render . -o output/custom.png
+
+# 校验
+chartstudio check .
+chartstudio check . -q                         # 仅输出 ok 或 N error(s), M warn(s)
+
+# 复现脚本（-o 默认 reproduce.py）
+chartstudio script .
+chartstudio script . -f svg -o reproduce.py
+```
+
+**默认输出位置：**
+
+| 命令 | 未指定 `-o` 时 |
+|------|----------------|
+| `render` | `{项目目录}/output/chart.png`（有图表标题则用标题作文件名） |
+| `script` | `{项目目录}/reproduce.py` |
+
+通用选项：`-f png|svg|pdf`、`-t {template_id}`（一般不必填，配置里已有 `template_id`）。
+
+---
+
+### React Annotation Editor（原型，可选）
+
+用于验证：**拖动 annotation → 保存 chart_config.yaml → Matplotlib 重新渲染后位置一致**。不替代 Streamlit，不含数据导入、风格预设等完整功能。
+
+需要 **两个终端**：
+
+```bash
+# 终端 1：轻量 API（项目根目录）
+uvicorn core.api_server:app --reload --port 8000
+
+# 终端 2：React 前端
+cd frontend
+npm install   # 首次
+npm run dev
+```
+
+浏览器打开 http://localhost:5173 ，在顶部输入 `chart_config.yaml` 的**绝对路径**（例如 `examples/v2_annotations_acceptance/chart_config.yaml`），点击 **打开配置**。
+
+| 能力 | 说明 |
+|------|------|
+| 可编辑 | `text`、`rectangle`（仅 `coord=axes`，画布上拖动 + 右侧属性） |
+| 只读 | `arrow`（含 axes / data 混合坐标，暂不支持拖端点） |
+| 保存 | 调用 `/api/save-config`，经 `config_validator` 校验后写 YAML |
+| 重渲染 | 调用 `/api/render`，Matplotlib 输出 SVG 作为底图 |
+
+API 接口：`/api/open-config`、`/api/render`、`/api/save-config`、`/api/check`。详见 [`frontend/README.md`](frontend/README.md)。
+
+---
+
+## 怎么用（Streamlit）
 
 ### 打开或新建项目
 
@@ -177,7 +255,7 @@ font:
 | `axes` / `legend` / `series` | 坐标轴、图例、系列样式 |
 | `annotations` | 文本、箭头、矩形等叠加标注 |
 
-`annotations` 示例（text / arrow / rectangle）见 `examples/v2_annotations_acceptance/`。
+`annotations` 示例（text / arrow / rectangle）见 `examples/v2_annotations_acceptance/`。React 原型可在该示例上拖动 `coord=axes` 的 text / rectangle 做往返验证。
 
 打开旧版配置时，`normalize_config` 会自动迁移字段（如 `chart.width` → `figure.width`、`chart.dpi` → `export.dpi`），并补齐 `layout`、`annotations`、`font.zh/en/num` 等结构。
 
@@ -200,6 +278,15 @@ font:
 **透明背景适合什么场景？**  
 适合插入 PPT；Word 排版或打印建议关闭透明背景。
 
+**React 原型打不开配置？**  
+确认 API 已在 8000 端口运行；路径必须是本机可访问的绝对路径；前端 dev 服务器通过 Vite 代理访问 `/api`。
+
+**`chartstudio` 命令找不到？**  
+在仓库根目录执行 `pip install -e .`；或改用 `python -m core.cli`。
+
+**CLI 提示找不到 chart_config.yaml？**  
+确认当前目录是项目文件夹，或直接传入 yaml 路径 / 含配置的目录路径。
+
 ---
 
 ## 项目文件夹里有什么
@@ -215,22 +302,29 @@ font:
 | `fonts/` | 可选，放置自定义字体文件 |
 | `configs/` | 配置快照备份 |
 
+仓库根目录另有 `frontend/`（React 原型源码）与 `pyproject.toml`（CLI 入口 `chartstudio` / `cs`），不属于单个图表项目。
+
 其余文件由 ChartStudio 自动维护。一般只需关心 `output` 与 `data`；进阶用户或 AI 协作时可编辑 `chart_config.yaml`。
 
 ---
 
 ## 开发者 / 架构说明
 
-逻辑集中在 `core/`，Streamlit 界面（`app.py`）只做编排。主要模块：
+逻辑集中在 `core/`，Streamlit 界面（`app.py`）只做编排；React 原型通过薄 API 复用同一套 `render_service` 与配置协议。
 
 | 模块 | 作用 |
 |------|------|
-| `core/render_service.py` | 统一渲染入口 |
+| `app.py` | Streamlit 主入口（编排，非业务核心） |
+| `core/render_service.py` | 统一渲染入口（Streamlit / CLI / API 共用） |
+| `core/api_server.py` | FastAPI：open-config / render / save-config / check |
 | `core/font_registry.py` | 字体注册表与 display/family/path 解析 |
 | `core/font_utils.py` | `FontProperties` 解析与字体诊断 |
 | `core/config_migrate.py` | 配置规范化与 v2 迁移 |
+| `core/config_validator.py` | 保存前校验（含 annotations 协议） |
 | `core/layout.py` / `core/annotations.py` | 布局与标注 |
-| `core/cli.py` | 命令行渲染与校验 |
+| `core/cli.py` | 命令行入口（`chartstudio` / `cs` / `python -m core.cli`） |
+| `core/cli_paths.py` | CLI 项目路径解析与默认输出路径 |
+| `frontend/` | React + Zustand；SVG 底图 + overlay 编辑 annotations |
 | `templates/*/` | 各图表模板（`chart_config.yaml` + `chart_core.py`） |
 
-验收示例：`examples/v2_annotations_acceptance/`（含 `reproduce.py`）。
+验收示例：`examples/v2_annotations_acceptance/`（含 `reproduce.py`；亦可作为 React 原型测试配置）。

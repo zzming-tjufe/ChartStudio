@@ -14,24 +14,61 @@ matplotlib.use("Agg")
 
 import matplotlib.pyplot as plt
 
+from core.cli_paths import (
+    default_render_output,
+    default_script_output,
+    resolve_output_format,
+    resolve_project_config,
+)
 from core.config_loader import load_yaml
 from core.config_migrate import normalize_config
 from core.config_validator import validate_config_for_save
 from core.exporter import export_figure
 from core.render_service import render_chart_from_config, render_chart_from_file
 
+_SUBCOMMANDS = frozenset({"render", "check", "script", "export-code", "validate", "help"})
+
 
 def _repo_root() -> Path:
     return Path(__file__).resolve().parent.parent
 
 
+def _ensure_repo_on_path() -> None:
+    repo = _repo_root()
+    if str(repo) not in sys.path:
+        sys.path.insert(0, str(repo))
+
+
+def _normalize_argv(argv: list[str]) -> list[str]:
+    """无子命令时默认 render，例如：chartstudio .  →  render ."""
+    if not argv:
+        return ["render", "."]
+    if argv[0] in _SUBCOMMANDS or argv[0].startswith("-"):
+        return argv
+    return ["render", *argv]
+
+
+def _resolve_config_arg(path: str) -> Path:
+    try:
+        return resolve_project_config(path)
+    except FileNotFoundError as exc:
+        print(str(exc), file=sys.stderr)
+        raise SystemExit(1) from exc
+
+
 def _cmd_render(args: argparse.Namespace) -> int:
-    config_path = Path(args.config).expanduser().resolve()
-    out_path = Path(args.out).expanduser().resolve()
-    suffix = out_path.suffix.lower().lstrip(".")
-    if suffix not in ("png", "svg", "pdf"):
-        print(f"不支持的输出格式：{suffix}，请使用 .png / .svg / .pdf", file=sys.stderr)
+    config_path = _resolve_config_arg(args.config)
+    try:
+        fmt, explicit_out = resolve_output_format(
+            out_path=Path(args.out).expanduser().resolve() if args.out else None,
+            format_arg=args.format,
+            default="png",
+        )
+    except ValueError as exc:
+        print(str(exc), file=sys.stderr)
         return 1
+
+    out_path = explicit_out if explicit_out is not None else default_render_output(config_path, fmt)
 
     try:
         fig = render_chart_from_file(config_path, template_id=args.template)
@@ -56,7 +93,7 @@ def _cmd_render(args: argparse.Namespace) -> int:
         saved = export_figure(
             fig,
             out_path.parent,
-            suffix,  # type: ignore[arg-type]
+            fmt,  # type: ignore[arg-type]
             filename=out_path.name,
             dpi=dpi,
             transparent=transparent,
@@ -71,7 +108,7 @@ def _cmd_render(args: argparse.Namespace) -> int:
 
 
 def _cmd_check(args: argparse.Namespace) -> int:
-    config_path = Path(args.config).expanduser().resolve()
+    config_path = _resolve_config_arg(args.config)
     try:
         config = load_yaml(config_path)
         config["_project_root"] = str(config_path.parent)
@@ -87,43 +124,51 @@ def _cmd_check(args: argparse.Namespace) -> int:
             render_probe=_probe,
         )
 
-        if notes:
-            print("迁移说明：")
-            for note in notes:
-                print(f"  - {note}")
+        errors = [i for i in issues if i.level == "error"]
+        warns = [i for i in issues if i.level == "warn"]
 
-        if not issues:
-            print("校验通过，未发现 warn/error。")
-            return 0
+        if not args.quiet:
+            if notes:
+                print("迁移说明：")
+                for note in notes:
+                    print(f"  - {note}")
+            if not issues:
+                print("校验通过，未发现 warn/error。")
+            else:
+                for item in issues:
+                    prefix = "ERROR" if item.level == "error" else "WARN"
+                    print(f"[{prefix}] {item.field}: {item.message}")
+        elif not issues:
+            print("ok")
+        else:
+            print(f"{len(errors)} error(s), {len(warns)} warn(s)")
 
-        has_error = False
-        for item in issues:
-            prefix = "ERROR" if item.level == "error" else "WARN"
-            print(f"[{prefix}] {item.field}: {item.message}")
-            if item.level == "error":
-                has_error = True
-        return 1 if has_error else 0
+        return 1 if errors else 0
     except Exception as exc:
         print(f"校验失败：{exc}", file=sys.stderr)
         return 1
 
 
 def _cmd_export_code(args: argparse.Namespace) -> int:
-    config_path = Path(args.config).expanduser().resolve()
-    out_path = Path(args.out).expanduser().resolve()
+    config_path = _resolve_config_arg(args.config)
+    out_path = (
+        Path(args.out).expanduser().resolve()
+        if args.out
+        else default_script_output(config_path)
+    )
     template_id = args.template or ""
-    export_format = str(args.format or "png").strip().lower()
-    if export_format not in ("png", "svg", "pdf"):
-        print(f"不支持的格式：{export_format}，请使用 png / svg / pdf", file=sys.stderr)
+    try:
+        export_format, _ = resolve_output_format(out_path=None, format_arg=args.format, default="png")
+    except ValueError as exc:
+        print(str(exc), file=sys.stderr)
         return 1
     repo = str(_repo_root())
 
     script = textwrap.dedent(
         f'''\
-        """ChartStudio 复现脚本 — 由 export-code 生成。
+        """ChartStudio 复现脚本 — 由 chartstudio script 生成。
 
-        默认导出 {export_format.upper()}；生成时可指定 --format svg/pdf。
-        也可修改下方 EXPORT_FORMAT 常量。
+        默认导出 {export_format.upper()}；可修改下方 EXPORT_FORMAT 常量。
         """
         from __future__ import annotations
 
@@ -209,40 +254,96 @@ def _cmd_export_code(args: argparse.Namespace) -> int:
     return 0
 
 
-def main(argv: list[str] | None = None) -> int:
-    repo = _repo_root()
-    if str(repo) not in sys.path:
-        sys.path.insert(0, str(repo))
+def _build_parser(prog: str = "chartstudio") -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog=prog,
+        description="ChartStudio CLI — 渲染 / 校验 / 导出复现脚本",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=textwrap.dedent(
+            """\
+            示例：
+              chartstudio .                    # 渲染当前目录 → output/chart.png
+              chartstudio render . -f svg      # 渲染为 SVG
+              chartstudio check examples/v2_annotations_acceptance
+              chartstudio script .             # 生成 reproduce.py
+            """
+        ),
+    )
+    sub = parser.add_subparsers(dest="command")
 
-    parser = argparse.ArgumentParser(prog="python -m core.cli", description="ChartStudio CLI")
-    sub = parser.add_subparsers(dest="command", required=True)
+    def _add_target(p: argparse.ArgumentParser) -> None:
+        p.add_argument(
+            "config",
+            nargs="?",
+            default=".",
+            help="项目目录或 chart_config.yaml（默认当前目录）",
+        )
+        p.add_argument("-t", "--template", default=None, help="模板 ID（可选）")
 
     p_render = sub.add_parser("render", help="渲染 chart_config.yaml 到图片")
-    p_render.add_argument("config", help="chart_config.yaml 路径")
-    p_render.add_argument("--template", default=None, help="模板 ID（无同目录 chart_core.py 时使用）")
-    p_render.add_argument("--out", required=True, help="输出文件路径（.png/.svg/.pdf）")
+    _add_target(p_render)
+    p_render.add_argument("-o", "--out", default=None, help="输出文件（默认 项目/output/chart.png）")
+    p_render.add_argument(
+        "-f",
+        "--format",
+        default=None,
+        choices=("png", "svg", "pdf"),
+        help="输出格式（与 -o 二选一或组合；默认 png）",
+    )
     p_render.set_defaults(func=_cmd_render)
 
-    p_check = sub.add_parser("check", help="校验配置文件")
-    p_check.add_argument("config", help="chart_config.yaml 路径")
-    p_check.add_argument("--template", default=None, help="模板 ID")
+    p_check = sub.add_parser("check", aliases=["validate"], help="校验配置文件")
+    _add_target(p_check)
+    p_check.add_argument("-q", "--quiet", action="store_true", help="仅输出摘要")
     p_check.set_defaults(func=_cmd_check)
 
-    p_code = sub.add_parser("export-code", help="导出复现脚本")
-    p_code.add_argument("config", help="chart_config.yaml 路径")
-    p_code.add_argument("--template", default=None, help="模板 ID")
-    p_code.add_argument("--out", required=True, help="输出 .py 脚本路径")
-    p_code.add_argument(
+    p_script = sub.add_parser(
+        "script",
+        aliases=["export-code"],
+        help="导出复现脚本 reproduce.py",
+    )
+    _add_target(p_script)
+    p_script.add_argument("-o", "--out", default=None, help="脚本路径（默认 项目/reproduce.py）")
+    p_script.add_argument(
+        "-f",
         "--format",
         default="png",
         choices=("png", "svg", "pdf"),
-        help="复现脚本默认导出格式（默认 png）",
+        help="脚本内默认导出格式（默认 png）",
     )
-    p_code.set_defaults(func=_cmd_export_code)
+    p_script.set_defaults(func=_cmd_export_code)
 
-    args = parser.parse_args(argv)
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    _ensure_repo_on_path()
+    raw = list(argv if argv is not None else sys.argv[1:])
+
+    prog = "chartstudio"
+    if Path(sys.argv[0]).name in ("cli.py", "cli"):
+        prog = "python -m core.cli"
+
+    parser = _build_parser(prog=prog)
+
+    if raw in ([], ["-h"], ["--help"]):
+        parser.print_help()
+        return 0
+
+    normalized = _normalize_argv(raw)
+    args = parser.parse_args(normalized)
+
+    if not getattr(args, "func", None):
+        parser.print_help()
+        return 0
+
     with warnings.catch_warnings(record=False):
         return args.func(args)
+
+
+def main_entry() -> None:
+    """console_scripts 入口（pip install -e . 后可用 chartstudio / cs）。"""
+    raise SystemExit(main())
 
 
 if __name__ == "__main__":
